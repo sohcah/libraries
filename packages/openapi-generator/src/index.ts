@@ -2,7 +2,12 @@ import fs from "node:fs/promises";
 import { bundle } from "@readme/openapi-parser";
 import type { OpenAPIV2, OpenAPIV3, OpenAPIV3_1 } from "openapi-types";
 import { generate as babelGenerate } from "@babel/generator";
-import { Generator, type GeneratorOptions } from "./generator.js";
+import {
+  generate as generateEffect,
+  type GeneratorOptions,
+} from "./generator.js";
+import { Effect, Stream } from "effect";
+import { FileSystem, type WatchEvent } from "@effect/platform/FileSystem";
 
 type APIDocument<T extends object> =
   | OpenAPIV2.Document<T>
@@ -11,43 +16,57 @@ type APIDocument<T extends object> =
 
 export type OpenapiGenerateOptions = GeneratorOptions & {
   schema: APIDocument<object> | string;
-}
+};
 
 export type OpenapiGenerateToFileOptions = OpenapiGenerateOptions & {
   output: string;
   watch?: boolean;
   onGenerated?: () => void;
-}
+};
 
-export async function generate({ schema, ...options }: OpenapiGenerateOptions) {
-  const result = await bundle(schema);
+export const generate = Effect.fn(function* ({
+  schema,
+  ...options
+}: OpenapiGenerateOptions) {
+  const result = yield* Effect.tryPromise(() => bundle(schema));
   if (!("components" in result)) {
-    throw new Error("Not a valid OpenAPI 3.x document");
+    return yield* Effect.die(
+      new Error("Not a valid OpenAPI 3.x document")
+    );
   }
 
-  const program = new Generator(result, options).build();
+  const program = yield* generateEffect(result, options);
 
   return babelGenerate(program).code;
-}
+});
 
-export async function generateToFile({ onGenerated, output, watch, ...options }: OpenapiGenerateToFileOptions) {
-  let lastCode = await generate(options);
-  await fs.writeFile(output, lastCode);
+export const generateToFile = Effect.fn(function* ({
+  onGenerated,
+  output,
+  watch,
+  ...options
+}: OpenapiGenerateToFileOptions) {
+  const fs = yield* FileSystem;
+  let lastCode = yield* generate(options);
+  yield* fs.writeFileString(output, lastCode);
   onGenerated?.();
 
   if (watch) {
     if (typeof options.schema !== "string") {
       throw new Error("Schema must a file path to use watch mode");
     }
-    for await (const event of fs.watch(options.schema)) {
-      if (event.eventType === "change") {
-        const outputCode = await generate(options);
-        if (outputCode !== lastCode) {
-          await fs.writeFile(output, outputCode);
-          onGenerated?.();
-          lastCode = outputCode;
+    yield* Stream.runForEach(
+      fs.watch(options.schema),
+      Effect.fn(function* (event: WatchEvent) {
+        if (event._tag === "Update") {
+          const outputCode = yield* generate(options);
+          if (outputCode !== lastCode) {
+            yield* fs.writeFileString(output, outputCode);
+            onGenerated?.();
+            lastCode = outputCode;
+          }
         }
-      }
-    }
+      })
+    );
   }
-}
+});
