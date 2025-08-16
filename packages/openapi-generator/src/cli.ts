@@ -20,21 +20,19 @@ const command = Command.make("@sohcah/openapi-generator", {}).pipe(
       },
       Effect.fn(function* (args) {
         const config = yield* Effect.tryPromise(
-          () => import(`file://${process.cwd()}/${args.config}`),
+          () => import(`file://${process.cwd()}/${args.config}`)
         ).pipe(
           Effect.mapError(
-            (e) => new Error(`Failed to load config: ${e.message}`),
-          ),
+            (e) => new Error(`Failed to load config: ${e.message}`)
+          )
         );
-        yield* Effect.tryPromise(() =>
-          generateToFile({
-            ...config.default,
-            watch: args.watch,
-          }),
-        );
-      }),
+        yield* generateToFile({
+          ...config.default,
+          watch: args.watch,
+        });
+      })
     ),
-  ]),
+  ])
 );
 
 // Set up the CLI application
