@@ -61,7 +61,7 @@ export const Pet = Schema.Struct({
   category: Category.pipe(Schema.optional),
   photoUrls: Schema.Array(Schema.String.pipe(Schema.mutable)).pipe(Schema.mutable).pipe(Schema.mutable),
   tags: Schema.Array(Tag).pipe(Schema.mutable).pipe(Schema.mutable).pipe(Schema.optional),
-  status: Schema.Literal("available", "pending", "sold").pipe(Schema.mutable).pipe(Schema.optional)
+  /** pet status in the store*/status: Schema.Literal("available", "pending", "sold").pipe(Schema.mutable).pipe(Schema.optional)
 }).pipe(Schema.mutable);
 export type Pet = Schema.Schema.Type<typeof Pet>;
 export const AddPet_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
@@ -89,7 +89,7 @@ export const UpdatePet_Parameters = Schema.transform(ParametersSchema, Schema.St
 });
 export const UpdatePet_Response = Schema.parseJson(Pet);
 export const FindPetsByStatus_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  status: Schema.Literal("available", "pending", "sold").pipe(Schema.mutable)
+  /** Status values that need to be considered for filter*/status: Schema.Literal("available", "pending", "sold").pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
   decode: () => {
@@ -101,7 +101,7 @@ export const FindPetsByStatus_Parameters = Schema.transform(ParametersSchema, Sc
 });
 export const FindPetsByStatus_Response = Schema.parseJson(Schema.Array(Pet).pipe(Schema.mutable).pipe(Schema.mutable));
 export const FindPetsByTags_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  tags: Schema.Array(Schema.String.pipe(Schema.mutable)).pipe(Schema.mutable).pipe(Schema.mutable)
+  /** Tags to filter by*/tags: Schema.Array(Schema.String.pipe(Schema.mutable)).pipe(Schema.mutable).pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
   decode: () => {
@@ -113,7 +113,7 @@ export const FindPetsByTags_Parameters = Schema.transform(ParametersSchema, Sche
 });
 export const FindPetsByTags_Response = Schema.parseJson(Schema.Array(Pet).pipe(Schema.mutable).pipe(Schema.mutable));
 export const GetPetById_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
+  /** ID of pet to return*/petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
   decode: () => {
@@ -127,9 +127,9 @@ export const GetPetById_Parameters = Schema.transform(ParametersSchema, Schema.S
 });
 export const GetPetById_Response = Schema.parseJson(Pet);
 export const UpdatePetWithForm_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable),
-  name: Schema.String.pipe(Schema.mutable),
-  status: Schema.String.pipe(Schema.mutable)
+  /** ID of pet that needs to be updated*/petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable),
+  /** Name of pet that needs to be updated*/name: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
+  /** Status of pet that needs to be updated*/status: Schema.String.pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
   decode: () => {
@@ -144,8 +144,8 @@ export const UpdatePetWithForm_Parameters = Schema.transform(ParametersSchema, S
 });
 export const UpdatePetWithForm_Response = Schema.parseJson(Pet);
 export const DeletePet_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  api_key: Schema.String.pipe(Schema.mutable),
-  petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
+  api_key: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
+  /** Pet id to delete*/petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
   decode: () => {
@@ -159,8 +159,8 @@ export const DeletePet_Parameters = Schema.transform(ParametersSchema, Schema.St
   })
 });
 export const UploadFile_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable),
-  additionalMetadata: Schema.String.pipe(Schema.mutable),
+  /** ID of pet to update*/petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable),
+  /** Additional Metadata*/additionalMetadata: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   data: Schema.instanceOf(Blob)
 }), {
   strict: true,
@@ -195,7 +195,7 @@ export const Order = Schema.Struct({
   petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable).pipe(Schema.optional),
   quantity: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable).pipe(Schema.optional),
   shipDate: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
-  status: Schema.Literal("placed", "approved", "delivered").pipe(Schema.mutable).pipe(Schema.optional),
+  /** Order Status*/status: Schema.Literal("placed", "approved", "delivered").pipe(Schema.mutable).pipe(Schema.optional),
   complete: Schema.Boolean.pipe(Schema.mutable).pipe(Schema.optional)
 }).pipe(Schema.mutable);
 export type Order = Schema.Schema.Type<typeof Order>;
@@ -212,7 +212,7 @@ export const PlaceOrder_Parameters = Schema.transform(ParametersSchema, Schema.S
 });
 export const PlaceOrder_Response = Schema.parseJson(Order);
 export const GetOrderById_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  orderId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
+  /** ID of order that needs to be fetched*/orderId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
   decode: () => {
@@ -226,7 +226,7 @@ export const GetOrderById_Parameters = Schema.transform(ParametersSchema, Schema
 });
 export const GetOrderById_Response = Schema.parseJson(Order);
 export const DeleteOrder_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  orderId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
+  /** ID of the order that needs to be deleted*/orderId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
   decode: () => {
@@ -246,7 +246,7 @@ export const User = Schema.Struct({
   email: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   password: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   phone: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
-  userStatus: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable).pipe(Schema.optional)
+  /** User Status*/userStatus: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable).pipe(Schema.optional)
 }).pipe(Schema.mutable);
 export type User = Schema.Schema.Type<typeof User>;
 export const CreateUser_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
@@ -274,8 +274,8 @@ export const CreateUsersWithListInput_Parameters = Schema.transform(ParametersSc
 });
 export const CreateUsersWithListInput_Response = Schema.parseJson(User);
 export const LoginUser_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  username: Schema.String.pipe(Schema.mutable),
-  password: Schema.String.pipe(Schema.mutable)
+  /** The user name for login*/username: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
+  /** The password for login in clear text*/password: Schema.String.pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
   decode: () => {
@@ -294,7 +294,7 @@ export const LogoutUser_Parameters = Schema.transform(ParametersSchema, Schema.S
   encode: from => ({})
 });
 export const GetUserByName_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  username: Schema.String.pipe(Schema.mutable)
+  /** The name that needs to be fetched. Use user1 for testing*/username: Schema.String.pipe(Schema.mutable)
 }), {
   strict: true,
   decode: () => {
@@ -308,7 +308,7 @@ export const GetUserByName_Parameters = Schema.transform(ParametersSchema, Schem
 });
 export const GetUserByName_Response = Schema.parseJson(User);
 export const UpdateUser_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  username: Schema.String.pipe(Schema.mutable),
+  /** name that need to be deleted*/username: Schema.String.pipe(Schema.mutable),
   data: Schema.parseJson(User)
 }), {
   strict: true,
@@ -323,7 +323,7 @@ export const UpdateUser_Parameters = Schema.transform(ParametersSchema, Schema.S
   })
 });
 export const DeleteUser_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
-  username: Schema.String.pipe(Schema.mutable)
+  /** The name that needs to be deleted*/username: Schema.String.pipe(Schema.mutable)
 }), {
   strict: true,
   decode: () => {
@@ -337,6 +337,10 @@ export const DeleteUser_Parameters = Schema.transform(ParametersSchema, Schema.S
 });
 export function useApi() {
   return {
+    /**
+    ### Add a new pet to the store.
+    Add a new pet to the store.
+    **/
     AddPet: (parameters: Schema.Schema.Type<typeof AddPet_Parameters>) => queryOptions({
       queryKey: ["AddPet", parameters],
       queryFn: async () => await makeRequest({
@@ -347,6 +351,10 @@ export function useApi() {
         responseSchema: AddPet_Response
       })
     }),
+    /**
+    ### Update an existing pet
+    Update an existing pet by Id.
+    **/
     UpdatePet: (parameters: Schema.Schema.Type<typeof UpdatePet_Parameters>) => queryOptions({
       queryKey: ["UpdatePet", parameters],
       queryFn: async () => await makeRequest({
@@ -357,6 +365,10 @@ export function useApi() {
         responseSchema: UpdatePet_Response
       })
     }),
+    /**
+    ### Finds Pets by status.
+    Multiple status values can be provided with comma separated strings.
+    **/
     FindPetsByStatus: (parameters: Schema.Schema.Type<typeof FindPetsByStatus_Parameters>) => queryOptions({
       queryKey: ["FindPetsByStatus", parameters],
       queryFn: async () => await makeRequest({
@@ -367,6 +379,10 @@ export function useApi() {
         responseSchema: FindPetsByStatus_Response
       })
     }),
+    /**
+    ### Finds Pets by tags.
+    Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing.
+    **/
     FindPetsByTags: (parameters: Schema.Schema.Type<typeof FindPetsByTags_Parameters>) => queryOptions({
       queryKey: ["FindPetsByTags", parameters],
       queryFn: async () => await makeRequest({
@@ -377,6 +393,10 @@ export function useApi() {
         responseSchema: FindPetsByTags_Response
       })
     }),
+    /**
+    ### Find pet by ID.
+    Returns a single pet.
+    **/
     GetPetById: (parameters: Schema.Schema.Type<typeof GetPetById_Parameters>) => queryOptions({
       queryKey: ["GetPetById", parameters],
       queryFn: async () => await makeRequest({
@@ -387,6 +407,10 @@ export function useApi() {
         responseSchema: GetPetById_Response
       })
     }),
+    /**
+    ### Updates a pet in the store with form data.
+    Updates a pet resource based on the form data.
+    **/
     UpdatePetWithForm: (parameters: Schema.Schema.Type<typeof UpdatePetWithForm_Parameters>) => queryOptions({
       queryKey: ["UpdatePetWithForm", parameters],
       queryFn: async () => await makeRequest({
@@ -397,6 +421,10 @@ export function useApi() {
         responseSchema: UpdatePetWithForm_Response
       })
     }),
+    /**
+    ### Deletes a pet.
+    Delete a pet.
+    **/
     DeletePet: (parameters: Schema.Schema.Type<typeof DeletePet_Parameters>) => queryOptions({
       queryKey: ["DeletePet", parameters],
       queryFn: async () => await makeRequest({
@@ -406,6 +434,10 @@ export function useApi() {
         parameters
       })
     }),
+    /**
+    ### Uploads an image.
+    Upload image of the pet.
+    **/
     UploadFile: (parameters: Schema.Schema.Type<typeof UploadFile_Parameters>) => queryOptions({
       queryKey: ["UploadFile", parameters],
       queryFn: async () => await makeRequest({
@@ -416,6 +448,10 @@ export function useApi() {
         responseSchema: UploadFile_Response
       })
     }),
+    /**
+    ### Returns pet inventories by status.
+    Returns a map of status codes to quantities.
+    **/
     GetInventory: (parameters: Schema.Schema.Type<typeof GetInventory_Parameters>) => queryOptions({
       queryKey: ["GetInventory", parameters],
       queryFn: async () => await makeRequest({
@@ -426,6 +462,10 @@ export function useApi() {
         responseSchema: GetInventory_Response
       })
     }),
+    /**
+    ### Place an order for a pet.
+    Place a new order in the store.
+    **/
     PlaceOrder: (parameters: Schema.Schema.Type<typeof PlaceOrder_Parameters>) => queryOptions({
       queryKey: ["PlaceOrder", parameters],
       queryFn: async () => await makeRequest({
@@ -436,6 +476,10 @@ export function useApi() {
         responseSchema: PlaceOrder_Response
       })
     }),
+    /**
+    ### Find purchase order by ID.
+    For valid response try integer IDs with value <= 5 or > 10. Other values will generate exceptions.
+    **/
     GetOrderById: (parameters: Schema.Schema.Type<typeof GetOrderById_Parameters>) => queryOptions({
       queryKey: ["GetOrderById", parameters],
       queryFn: async () => await makeRequest({
@@ -446,6 +490,10 @@ export function useApi() {
         responseSchema: GetOrderById_Response
       })
     }),
+    /**
+    ### Delete purchase order by identifier.
+    For valid response try integer IDs with value < 1000. Anything above 1000 or non-integers will generate API errors.
+    **/
     DeleteOrder: (parameters: Schema.Schema.Type<typeof DeleteOrder_Parameters>) => queryOptions({
       queryKey: ["DeleteOrder", parameters],
       queryFn: async () => await makeRequest({
@@ -455,6 +503,10 @@ export function useApi() {
         parameters
       })
     }),
+    /**
+    ### Create user.
+    This can only be done by the logged in user.
+    **/
     CreateUser: (parameters: Schema.Schema.Type<typeof CreateUser_Parameters>) => queryOptions({
       queryKey: ["CreateUser", parameters],
       queryFn: async () => await makeRequest({
@@ -465,6 +517,10 @@ export function useApi() {
         responseSchema: CreateUser_Response
       })
     }),
+    /**
+    ### Creates list of users with given input array.
+    Creates list of users with given input array.
+    **/
     CreateUsersWithListInput: (parameters: Schema.Schema.Type<typeof CreateUsersWithListInput_Parameters>) => queryOptions({
       queryKey: ["CreateUsersWithListInput", parameters],
       queryFn: async () => await makeRequest({
@@ -475,6 +531,10 @@ export function useApi() {
         responseSchema: CreateUsersWithListInput_Response
       })
     }),
+    /**
+    ### Logs user into the system.
+    Log into the system.
+    **/
     LoginUser: (parameters: Schema.Schema.Type<typeof LoginUser_Parameters>) => queryOptions({
       queryKey: ["LoginUser", parameters],
       queryFn: async () => await makeRequest({
@@ -485,6 +545,10 @@ export function useApi() {
         responseSchema: LoginUser_Response
       })
     }),
+    /**
+    ### Logs out current logged in user session.
+    Log user out of the system.
+    **/
     LogoutUser: (parameters: Schema.Schema.Type<typeof LogoutUser_Parameters>) => queryOptions({
       queryKey: ["LogoutUser", parameters],
       queryFn: async () => await makeRequest({
@@ -494,6 +558,10 @@ export function useApi() {
         parameters
       })
     }),
+    /**
+    ### Get user by user name.
+    Get user detail based on username.
+    **/
     GetUserByName: (parameters: Schema.Schema.Type<typeof GetUserByName_Parameters>) => queryOptions({
       queryKey: ["GetUserByName", parameters],
       queryFn: async () => await makeRequest({
@@ -504,6 +572,10 @@ export function useApi() {
         responseSchema: GetUserByName_Response
       })
     }),
+    /**
+    ### Update user resource.
+    This can only be done by the logged in user.
+    **/
     UpdateUser: (parameters: Schema.Schema.Type<typeof UpdateUser_Parameters>) => queryOptions({
       queryKey: ["UpdateUser", parameters],
       queryFn: async () => await makeRequest({
@@ -513,6 +585,10 @@ export function useApi() {
         parameters
       })
     }),
+    /**
+    ### Delete user resource.
+    This can only be done by the logged in user.
+    **/
     DeleteUser: (parameters: Schema.Schema.Type<typeof DeleteUser_Parameters>) => queryOptions({
       queryKey: ["DeleteUser", parameters],
       queryFn: async () => await makeRequest({
