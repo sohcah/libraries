@@ -1,5 +1,6 @@
 {
   "name": "@sohcah/libraries-docs",
+  "packageManager": "yarn@4.9.1",
   "private": true,
   "scripts": {
     "dev": "rspress dev",
