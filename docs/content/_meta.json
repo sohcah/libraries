@@ -1,0 +1,14 @@
+[
+  {
+    "text": "Home",
+    "link": "/",
+    "activeMatch": "^/$",
+    "position": "left"
+  },
+  {
+    "text": "Docs",
+    "link": "/docs",
+    "activeMatch": "^/docs",
+    "position": "left"
+  }
+]

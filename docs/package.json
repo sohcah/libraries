@@ -1,0 +1,16 @@
+{
+  "name": "@sohcah/libraries-docs",
+  "private": true,
+  "scripts": {
+    "dev": "rspress dev",
+    "build": "rspress build",
+    "preview": "rspress preview"
+  },
+  "devDependencies": {
+    "@rspress/plugin-shiki": "^1.45.0",
+    "rspress": "^1.45.0"
+  },
+  "volta": {
+    "extends": "../package.json"
+  }
+}

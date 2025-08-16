@@ -1,0 +1,43 @@
+{
+  "name": "@sohcah/react-warp",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sam Hindess <mail@sohcah.dev>",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "tsdown": "^0.12.9",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "jotai": "^2.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "volta": {
+    "extends": "../../package.json"
+  }
+}

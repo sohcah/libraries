@@ -1,0 +1,26 @@
+{
+  "name": "@sohcah/libraries",
+  "private": true,
+  "license": "MIT",
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "docs"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sohcah/libraries.git"
+  },
+  "scripts": {
+    "test": "yarn workspaces foreach -p -A run test"
+  },
+  "packageManager": "yarn@4.9.1",
+  "volta": {
+    "node": "24.4.1",
+    "yarn": "4.9.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}

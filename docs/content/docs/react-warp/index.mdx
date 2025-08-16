@@ -1,0 +1,119 @@
+import { PackageManagerTabs } from "@theme";
+
+# Getting Started
+
+## Installation
+
+<PackageManagerTabs command="install @sohcah/react-warp" />
+
+## Usage
+
+### Popups
+
+```tsx title="popups.ts"
+import { createPopupHost } from "@sohcah/react-warp";
+
+export const { PopupHost, usePopup } = createPopupHost<
+  // Popup Context
+  null,
+  // Popup Options
+  {
+    backgroundColor?: string;
+  }
+>({
+  renderPopup: (popup) => {
+    return (
+      <>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            pointerEvents: popup.isOpen ? "auto" : "none",
+          }}
+          onClick={() => popup.close()}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            opacity: popup.isOpen ? 1 : 0,
+            transition: "opacity 0.3s ease-in-out",
+            backgroundColor: popup.options.backgroundColor ?? "white",
+            padding: 16,
+            borderRadius: 8,
+            boxShadow: "0 0 10px 0 rgba(0, 0, 0, 0.1)",
+            pointerEvents: popup.isOpen ? "auto" : "none",
+          }}
+        >
+          {popup.children}
+        </div>
+      </>
+    );
+  },
+  useContext: () => null,
+});
+```
+
+```tsx title="App.tsx"
+import { PopupHost, usePopup } from "./popups";
+
+const MyPopupContent = ({
+  onClose,
+}: {
+  onClose: (value: string | null) => void;
+}) => {
+  const [name, setName] = useState<string>("");
+  return (
+    <div>
+      <h1>My Amazing Popup</h1>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <button onClick={() => onClose(null)}>Cancel</button>
+      <button onClick={() => onClose(name)}>Submit</button>
+    </div>
+  );
+};
+
+const MyAppContent = () => {
+  const openPopup = usePopup();
+
+  return (
+    <div>
+      <h1>My Amazing App</h1>
+      <button
+        onClick={async () => {
+          const name = await openPopup<string>(
+            (onClose) => <MyPopupContent onClose={onClose} />,
+            { backgroundColor: "lightblue" }
+          );
+          if (name === null) {
+            console.info("Popup closed.");
+            return;
+          }
+          alert(`Hello, ${name}!`);
+        }}
+      >
+        Enter name
+      </button>
+    </div>
+  );
+};
+
+export const App = () => {
+  return (
+    <MyAppProvider>
+      <MyAppContent />
+      <PopupHost />
+    </MyAppProvider>
+  );
+};
+```
