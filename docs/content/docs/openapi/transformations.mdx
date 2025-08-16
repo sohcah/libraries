@@ -1,0 +1,37 @@
+# Custom Transformations
+
+## `date-time` String to `Temporal.Instant`
+
+```ts title="openapi.config.ts"
+import { defineConfig } from "@sohcah/openapi-generator/config";
+
+export default defineConfig({
+  schema: "swagger.json",
+  output: "src/api.ts",
+  schemas: {
+    custom(schema) {
+      if (schema.type === "string" && schema.format === "date-time") {
+        return {
+          type: "import",
+          name: "instant",
+          from: "./api.schemas.js",
+        };
+      }
+      return null;
+    },
+  },
+});
+```
+
+```ts title="src/api.schemas.ts"
+import { Schema } from "effect";
+import { Temporal } from "@js-temporal/polyfill";
+
+export const instant = Schema.String.pipe(
+  Schema.transform(Schema.instanceOf(Temporal.Instant), {
+    strict: true,
+    decode: (str) => Temporal.Instant.from(str),
+    encode: (date) => date.toString(),
+  })
+);
+```

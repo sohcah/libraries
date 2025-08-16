@@ -1,0 +1,33 @@
+import { PackageManagerTabs } from "@theme";
+
+# Getting Started
+
+## Installation
+
+<PackageManagerTabs command="install -D @sohcah/openapi-generator" />
+
+### Peer Dependencies
+
+The generated source from the OpenAPI Generator requires `@tanstack/react-query` and `effect`.
+
+<PackageManagerTabs command="install @tanstack/react-query effect" />
+
+## Usage
+
+```ts title="openapi.config.ts"
+import { defineConfig } from "@sohcah/openapi-generator/config";
+
+export default defineConfig({
+  schema: "swagger.json",
+  output: "src/api.ts",
+});
+```
+
+```json title="package.json"
+{
+  "scripts": {
+    "openapi-build": "@sohcah/openapi-generator build",
+    "openapi-dev": "@sohcah/openapi-generator watch"
+  }
+}
+```
