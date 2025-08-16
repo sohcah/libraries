@@ -87,9 +87,10 @@ const addImport = Effect.fn(function* (name: string, from: string) {
 });
 
 const getKey = Effect.fn(function* (name: string) {
-  if (!name) return yield* new NotImplementedError({
-    message: "key for empty name",
-  });
+  if (!name)
+    return yield* new NotImplementedError({
+      message: "key for empty name",
+    });
   const key = `${name[0]!.toUpperCase()}${name.slice(1)}`;
   return key.replace(/[^a-zA-Z0-9]/g, "_");
 });
@@ -385,9 +386,14 @@ const getBaseEffectSchema = Effect.fn(function* (
           decodedMember.optional = true;
           encodedMember.optional = true;
         }
-        object.properties.push(
-          t.objectProperty(t.identifier(propertyKey), propertySchema.expression)
+        const objectProperty = t.objectProperty(
+          t.identifier(propertyKey),
+          propertySchema.expression
         );
+        if (property.description) {
+          t.addComment(objectProperty, "leading", `* ${property.description}`);
+        }
+        object.properties.push(objectProperty);
         objectTypeDecoded.members.push(decodedMember);
         objectTypeEncoded.members.push(encodedMember);
       }
@@ -481,7 +487,9 @@ const applyModifiers = Effect.fn(function* (
 const getSchema = Effect.fn(function* (
   schema: SchemaObject | ReferenceObject
 ): Generator<
-  YieldWrap<Effect.Effect<ExpressionWithType, NotImplementedError, GeneratorContext>>,
+  YieldWrap<
+    Effect.Effect<ExpressionWithType, NotImplementedError, GeneratorContext>
+  >,
   ExpressionWithType,
   never
 > {
@@ -552,12 +560,21 @@ const getParametersSchema = Effect.fn(function* (
         message: "parameter without schema",
       });
     }
-    object.properties.push(
-      t.objectProperty(
-        t.identifier(parameter.name),
-        (yield* getSchema(parameter.schema)).expression
-      )
+    let expression = (yield* getSchema(parameter.schema)).expression;
+    if (!parameter.required) {
+      expression = t.callExpression(
+        t.memberExpression(expression, t.identifier("pipe")),
+        [t.memberExpression(t.identifier("Schema"), t.identifier("optional"))]
+      );
+    }
+    const objectProperty = t.objectProperty(
+      t.identifier(parameter.name),
+      expression
     );
+    if (parameter.description) {
+      t.addComment(objectProperty, "leading", `* ${parameter.description}`);
+    }
+    object.properties.push(objectProperty);
     if (parameter.in === "query") {
       queryArray.elements.push(
         t.arrayExpression([
@@ -800,61 +817,72 @@ const build = Effect.fn(function* () {
         )
       );
 
-      ctx.apiMethods.push(
-        t.objectProperty(
-          t.identifier(operationId),
-          t.arrowFunctionExpression(
-            [parameters],
-            t.callExpression(t.identifier("queryOptions"), [
-              t.objectExpression([
-                t.objectProperty(
-                  t.identifier("queryKey"),
-                  t.arrayExpression([t.stringLiteral(operationId), parameters])
-                ),
-                t.objectProperty(
-                  t.identifier("queryFn"),
-                  t.arrowFunctionExpression(
-                    [],
-                    t.awaitExpression(
-                      t.callExpression(t.identifier("makeRequest"), [
-                        t.objectExpression([
-                          t.objectProperty(
-                            t.identifier("method"),
-                            t.stringLiteral(methodKey)
-                          ),
-                          t.objectProperty(
-                            t.identifier("path"),
-                            t.stringLiteral(pathKey)
-                          ),
-                          t.objectProperty(
-                            t.identifier("parameterSchema"),
-                            parametersSchema
-                          ),
-                          t.objectProperty(
-                            t.identifier("parameters"),
-                            parameters,
-                            false,
-                            true
-                          ),
-                          ...(responseSchema
-                            ? [
-                                t.objectProperty(
-                                  t.identifier("responseSchema"),
-                                  responseSchema
-                                ),
-                              ]
-                            : []),
-                        ]),
-                      ])
-                    ),
-                    true
-                  )
-                ),
-              ]),
-            ])
-          )
+      const objectProperty = t.objectProperty(
+        t.identifier(operationId),
+        t.arrowFunctionExpression(
+          [parameters],
+          t.callExpression(t.identifier("queryOptions"), [
+            t.objectExpression([
+              t.objectProperty(
+                t.identifier("queryKey"),
+                t.arrayExpression([t.stringLiteral(operationId), parameters])
+              ),
+              t.objectProperty(
+                t.identifier("queryFn"),
+                t.arrowFunctionExpression(
+                  [],
+                  t.awaitExpression(
+                    t.callExpression(t.identifier("makeRequest"), [
+                      t.objectExpression([
+                        t.objectProperty(
+                          t.identifier("method"),
+                          t.stringLiteral(methodKey)
+                        ),
+                        t.objectProperty(
+                          t.identifier("path"),
+                          t.stringLiteral(pathKey)
+                        ),
+                        t.objectProperty(
+                          t.identifier("parameterSchema"),
+                          parametersSchema
+                        ),
+                        t.objectProperty(
+                          t.identifier("parameters"),
+                          parameters,
+                          false,
+                          true
+                        ),
+                        ...(responseSchema
+                          ? [
+                              t.objectProperty(
+                                t.identifier("responseSchema"),
+                                responseSchema
+                              ),
+                            ]
+                          : []),
+                      ]),
+                    ])
+                  ),
+                  true
+                )
+              ),
+            ]),
+          ])
         )
       );
+
+      const commentLines = [];
+      if (method.summary) commentLines.push(`### ${method.summary}`);
+      if (method.description) commentLines.push(`${method.description}`);
+      if (commentLines.length) {
+        t.addComment(
+          objectProperty,
+          "leading",
+          `*\n${commentLines.join("\n")}\n*`
+        );
+      }
+
+      ctx.apiMethods.push(objectProperty);
     }
   }
 
