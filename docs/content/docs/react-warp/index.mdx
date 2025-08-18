@@ -25,6 +25,7 @@ export const { PopupHost, usePopup } = createPopupHost<
     return (
       <>
         <div
+          aria-hidden={!popup.isOpen}
           style={{
             position: "fixed",
             top: 0,
@@ -37,6 +38,7 @@ export const { PopupHost, usePopup } = createPopupHost<
           onClick={() => popup.close()}
         />
         <div
+          aria-hidden={!popup.isOpen}
           style={{
             position: "absolute",
             top: "50%",

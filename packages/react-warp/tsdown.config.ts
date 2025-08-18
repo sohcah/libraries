@@ -1,3 +1,4 @@
+/* v8 ignore start */
 import { defineConfig } from "tsdown";
 
 export default defineConfig({

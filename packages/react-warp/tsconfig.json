@@ -18,7 +18,7 @@
     /* If transpiling with TypeScript: */
     "module": "NodeNext",
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "sourceMap": true,
 
     /* AND if you're building for a library: */
@@ -28,7 +28,6 @@
     "declarationMap": true,
 
     "lib": ["es2022", "dom"],
-    "types": ["node"],
 
     "jsx": "react-jsx"
   },
