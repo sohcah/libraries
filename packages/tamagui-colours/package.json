@@ -1,0 +1,52 @@
+{
+  "name": "@sohcah/tamagui-colours",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sam Hindess <mail@sohcah.dev>",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": "./dist/cli.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "cli": "yarn build && ./dist/cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsdown": "^0.12.9",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@effect/cli": "^0.69.0",
+    "@effect/cluster": "^0.48.0",
+    "@effect/experimental": "^0.54.6",
+    "@effect/platform": "^0.90.3",
+    "@effect/platform-node": "^0.96.0",
+    "@effect/printer-ansi": "^0.45.0",
+    "@effect/rpc": "^0.69.0",
+    "@effect/sql": "^0.44.1",
+    "@effect/typeclass": "^0.36.0",
+    "@radix-ui/colors": "^3.0.0",
+    "bezier-easing": "^2.1.0",
+    "colorjs.io": "^0.5.2",
+    "effect": "^3.17.7"
+  },
+  "volta": {
+    "extends": "../../package.json"
+  }
+}
