@@ -1,17 +1,33 @@
 {
   "name": "@sohcah/libraries-docs",
   "packageManager": "yarn@4.9.1",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "rspress dev",
-    "build": "rspress build",
-    "preview": "rspress preview"
+    "build": "next build",
+    "dev": "next dev --turbo",
+    "start": "next start",
+    "postinstall": "fumadocs-mdx"
+  },
+  "dependencies": {
+    "fumadocs-core": "15.7.12",
+    "fumadocs-docgen": "^3.0.0",
+    "fumadocs-mdx": "11.10.0",
+    "fumadocs-ui": "15.7.12",
+    "lucide-react": "^0.544.0",
+    "next": "15.5.3",
+    "oxc-transform": "^0.89.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
-    "@rspress/plugin-shiki": "^1.45.0",
-    "rspress": "^1.45.0"
-  },
-  "volta": {
-    "extends": "../package.json"
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "24.3.3",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2"
   }
 }

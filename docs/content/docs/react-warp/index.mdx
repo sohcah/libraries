@@ -1,16 +1,19 @@
-import { PackageManagerTabs } from "@theme";
-
-# Getting Started
+---
+title: React Warp
+icon: Copy
+---
 
 ## Installation
 
-<PackageManagerTabs command="install @sohcah/react-warp" />
+```package-install
+npm install @sohcah/react-warp
+```
 
 ## Usage
 
 ### Popups
 
-```tsx title="popups.ts"
+```tsx ts2js title="popups.ts"
 import { createPopupHost } from "@sohcah/react-warp";
 
 export const { PopupHost, usePopup } = createPopupHost<
@@ -62,7 +65,7 @@ export const { PopupHost, usePopup } = createPopupHost<
 });
 ```
 
-```tsx title="App.tsx"
+```tsx ts2js title="App.tsx"
 import { PopupHost, usePopup } from "./popups";
 
 const MyPopupContent = ({
