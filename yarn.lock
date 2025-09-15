@@ -1869,6 +1869,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@sohcah/datepicker-react@workspace:packages/datepicker-react":
+  version: 0.0.0-use.local
+  resolution: "@sohcah/datepicker-react@workspace:packages/datepicker-react"
+  dependencies:
+    "@types/react": "npm:^19.1.5"
+    react: "npm:^19.1.0"
+    tsdown: "npm:^0.12.3"
+    typescript: "npm:^5.8.3"
+    vitest: "npm:^3.1.4"
+  peerDependencies:
+    react: ^19.1.0
+  languageName: unknown
+  linkType: soft
+
 "@sohcah/libraries-docs@workspace:docs":
   version: 0.0.0-use.local
   resolution: "@sohcah/libraries-docs@workspace:docs"
@@ -2198,6 +2212,15 @@ __metadata:
   dependencies:
     csstype: "npm:^3.0.2"
   checksum: 10c0/fb583deacd0a815e2775dc1b9f764532d8cacb748ddd2c2914805a46c257ce6c237b4078f44009692074db212ab61a390301c6470f07f5aa5bfdeb78a2acfda1
+  languageName: node
+  linkType: hard
+
+"@types/react@npm:^19.1.5":
+  version: 19.1.13
+  resolution: "@types/react@npm:19.1.13"
+  dependencies:
+    csstype: "npm:^3.0.2"
+  checksum: 10c0/75e35b54883f5ed07d3b5cb16a4711b6dbb7ec6b74301bcb9bfa697c9d9fff022ec508e1719e7b2c69e2e8b042faac1125be7717b5e5e084f816a2c88e136920
   languageName: node
   linkType: hard
 
@@ -5774,7 +5797,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react@npm:^19.0.0":
+"react@npm:^19.0.0, react@npm:^19.1.0":
   version: 19.1.1
   resolution: "react@npm:19.1.1"
   checksum: 10c0/8c9769a2dfd02e603af6445058325e6c8a24b47b185d0e461f66a6454765ddcaecb3f0a90184836c68bb509f3c38248359edbc42f0d07c23eb500a5c30c87b4e
@@ -6822,7 +6845,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tsdown@npm:^0.12.9":
+"tsdown@npm:^0.12.3, tsdown@npm:^0.12.9":
   version: 0.12.9
   resolution: "tsdown@npm:0.12.9"
   dependencies:
@@ -7253,7 +7276,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vitest@npm:^3.2.4":
+"vitest@npm:^3.1.4, vitest@npm:^3.2.4":
   version: 3.2.4
   resolution: "vitest@npm:3.2.4"
   dependencies:
