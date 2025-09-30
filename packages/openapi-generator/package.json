@@ -22,8 +22,8 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "vitest --run",
-    "cli": "yarn build && ./dist/cli.js",
-    "sample": "yarn cli generate -c ./sample/openapi.config.ts"
+    "cli": "./dist/cli.js",
+    "sample": "yarn build && yarn cli generate -c ./sample/openapi.config.ts && SCHEMA_FORMAT=effect yarn cli generate -c ./sample/openapi.config.ts && SCHEMA_FORMAT=zod-mini yarn cli generate -c ./sample/openapi.config.ts"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.85.3",
@@ -46,7 +46,8 @@
     "@effect/sql": "^0.44.1",
     "@effect/typeclass": "^0.36.0",
     "@readme/openapi-parser": "^5.0.1",
-    "effect": "^3.17.7"
+    "effect": "^3.17.7",
+    "zod": "^4.1.11"
   },
   "volta": {
     "extends": "../../package.json"

@@ -2,6 +2,12 @@ import * as t from "@babel/types";
 import { Context, Data, Effect } from "effect";
 import type { YieldWrap } from "effect/Utils";
 import type { OpenAPIV3, OpenAPIV3_1 } from "openapi-types";
+import {
+  getSchemaGenerator,
+  SchemaGeneratorContext,
+  type SchemaGenerator,
+  type SchemaGeneratorFormat,
+} from "./schema.js";
 
 type APIDocument<T extends object> =
   | OpenAPIV3_1.Document<T>
@@ -39,6 +45,8 @@ export type GeneratorOptions = {
   };
 
   schemas?: {
+    /** @default "zod" */
+    format?: SchemaGeneratorFormat;
     experimental_includeTypes?: boolean;
     custom?: (schema: SchemaObject) => ImportReference | null;
   };
@@ -58,6 +66,38 @@ class GeneratorContext extends Context.Tag("GeneratorContext")<
   GeneratorContext,
   GeneratorData
 >() {}
+
+function defaultParseJson(
+  schemaGenerator: SchemaGenerator
+): (expression: t.Expression) => t.Expression {
+  return (expression) =>
+    schemaGenerator.transformer({
+      encoded: schemaGenerator.schema.string,
+      decoded: expression,
+      decode: t.blockStatement([
+        t.tryStatement(
+          t.blockStatement([
+            t.returnStatement(
+              t.callExpression(
+                t.memberExpression(t.identifier("JSON"), t.identifier("parse")),
+                [t.identifier("from")]
+              )
+            ),
+          ]),
+          t.catchClause(
+            Object.assign(t.identifier("error"), {
+              typeAnnotation: t.tsTypeAnnotation(t.tsUnknownKeyword()),
+            }),
+            schemaGenerator.transformerCatch(t.identifier("error"))
+          )
+        ),
+      ]),
+      encode: t.callExpression(
+        t.memberExpression(t.identifier("JSON"), t.identifier("stringify")),
+        [t.identifier("from")]
+      ),
+    });
+}
 
 export class NotImplementedError extends Data.Error<{ message: string }> {}
 
@@ -91,14 +131,18 @@ const getKey = Effect.fn(function* (name: string) {
     return yield* new NotImplementedError({
       message: "key for empty name",
     });
-  const key = `${name[0]!.toUpperCase()}${name.slice(1)}`;
-  return key.replace(/[^a-zA-Z0-9]/g, "_");
+  const safeName = name.replace(/[^a-zA-Z0-9]/g, "_");
+  return {
+    lower: `${safeName[0]!.toLowerCase()}${safeName.slice(1)}`,
+    upper: `${safeName[0]!.toUpperCase()}${safeName.slice(1)}`,
+  };
 });
 
 const getBaseEffectSchema = Effect.fn(function* (
   schema: SchemaObject | ReferenceObject
 ) {
   const ctx = yield* GeneratorContext;
+  const schemaGenerator = yield* SchemaGeneratorContext;
 
   if ("$ref" in schema) {
     const ref = schema.$ref;
@@ -117,26 +161,20 @@ const getBaseEffectSchema = Effect.fn(function* (
     }
 
     if (ctx.processingSchemas.has(schemaName)) {
-      const fn = t.arrowFunctionExpression([], t.identifier(schemaKey));
+      const fn = t.arrowFunctionExpression([], t.identifier(schemaKey.upper));
       if (ctx.processingSchemaTypes.has(schemaName)) {
         return {
           expression: t.nullLiteral(),
           typeDecoded: t.tsTypeReference(
-            t.tsQualifiedName(
-              t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-              t.identifier("Type")
-            ),
+            schemaGenerator.types.typeDecoded,
             t.tsTypeParameterInstantiation([
-              t.tsTypeQuery(t.identifier(schemaKey)),
+              t.tsTypeQuery(t.identifier(schemaKey.upper)),
             ])
           ),
           typeEncoded: t.tsTypeReference(
-            t.tsQualifiedName(
-              t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-              t.identifier("Encoded")
-            ),
+            schemaGenerator.types.typeEncoded,
             t.tsTypeParameterInstantiation([
-              t.tsTypeQuery(t.identifier(schemaKey)),
+              t.tsTypeQuery(t.identifier(schemaKey.upper)),
             ])
           ),
         };
@@ -145,7 +183,7 @@ const getBaseEffectSchema = Effect.fn(function* (
       const typeSchema = yield* getSchema(resolvedSchema);
       fn.returnType = t.tsTypeAnnotation(
         t.tsTypeReference(
-          t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
+          schemaGenerator.types.schema,
           t.tsTypeParameterInstantiation([
             typeSchema.typeDecoded,
             typeSchema.typeEncoded,
@@ -154,26 +192,17 @@ const getBaseEffectSchema = Effect.fn(function* (
       );
       ctx.processingSchemaTypes.delete(schemaName);
       return {
-        expression: t.callExpression(
-          t.memberExpression(t.identifier("Schema"), t.identifier("suspend")),
-          [fn]
-        ),
+        expression: schemaGenerator.modifiers.lazy(fn),
         typeDecoded: t.tsTypeReference(
-          t.tsQualifiedName(
-            t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-            t.identifier("Type")
-          ),
+          schemaGenerator.types.typeDecoded,
           t.tsTypeParameterInstantiation([
-            t.tsTypeQuery(t.identifier(schemaKey)),
+            t.tsTypeQuery(t.identifier(schemaKey.upper)),
           ])
         ),
         typeEncoded: t.tsTypeReference(
-          t.tsQualifiedName(
-            t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-            t.identifier("Encoded")
-          ),
+          schemaGenerator.types.typeEncoded,
           t.tsTypeParameterInstantiation([
-            t.tsTypeQuery(t.identifier(schemaKey)),
+            t.tsTypeQuery(t.identifier(schemaKey.upper)),
           ])
         ),
       };
@@ -184,11 +213,11 @@ const getBaseEffectSchema = Effect.fn(function* (
 
       const schemaExpression = yield* getSchema(resolvedSchema);
 
-      const schemaKeyIdentifier = t.identifier(schemaKey);
+      const schemaKeyIdentifier = t.identifier(schemaKey.upper);
       if (ctx.options.schemas?.experimental_includeTypes) {
         schemaKeyIdentifier.typeAnnotation = t.tsTypeAnnotation(
           t.tsTypeReference(
-            t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
+            schemaGenerator.types.schema,
             t.tsTypeParameterInstantiation([
               schemaExpression.typeDecoded,
               schemaExpression.typeEncoded,
@@ -209,18 +238,12 @@ const getBaseEffectSchema = Effect.fn(function* (
 
         t.exportNamedDeclaration(
           t.tsTypeAliasDeclaration(
-            t.identifier(schemaKey),
+            t.identifier(schemaKey.upper),
             null,
             t.tsTypeReference(
-              t.tsQualifiedName(
-                t.tsQualifiedName(
-                  t.identifier("Schema"),
-                  t.identifier("Schema")
-                ),
-                t.identifier("Type")
-              ),
+              schemaGenerator.types.typeDecoded,
               t.tsTypeParameterInstantiation([
-                t.tsTypeQuery(t.identifier(schemaKey)),
+                t.tsTypeQuery(t.identifier(schemaKey.upper)),
               ])
             )
           )
@@ -230,20 +253,18 @@ const getBaseEffectSchema = Effect.fn(function* (
     }
 
     return {
-      expression: t.identifier(schemaKey),
+      expression: t.identifier(schemaKey.upper),
       typeDecoded: t.tsTypeReference(
-        t.tsQualifiedName(
-          t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-          t.identifier("Type")
-        ),
-        t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(schemaKey))])
+        schemaGenerator.types.typeDecoded,
+        t.tsTypeParameterInstantiation([
+          t.tsTypeQuery(t.identifier(schemaKey.upper)),
+        ])
       ),
       typeEncoded: t.tsTypeReference(
-        t.tsQualifiedName(
-          t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-          t.identifier("Encoded")
-        ),
-        t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(schemaKey))])
+        schemaGenerator.types.typeEncoded,
+        t.tsTypeParameterInstantiation([
+          t.tsTypeQuery(t.identifier(schemaKey.upper)),
+        ])
       ),
     };
   }
@@ -255,19 +276,13 @@ const getBaseEffectSchema = Effect.fn(function* (
     return {
       expression: t.identifier(customResult.name),
       typeDecoded: t.tsTypeReference(
-        t.tsQualifiedName(
-          t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-          t.identifier("Type")
-        ),
+        schemaGenerator.types.typeDecoded,
         t.tsTypeParameterInstantiation([
           t.tsTypeQuery(t.identifier(customResult.name)),
         ])
       ),
       typeEncoded: t.tsTypeReference(
-        t.tsQualifiedName(
-          t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-          t.identifier("Encoded")
-        ),
+        schemaGenerator.types.typeEncoded,
         t.tsTypeParameterInstantiation([
           t.tsTypeQuery(t.identifier(customResult.name)),
         ])
@@ -283,8 +298,7 @@ const getBaseEffectSchema = Effect.fn(function* (
       });
     }
     return {
-      expression: t.callExpression(
-        t.memberExpression(t.identifier("Schema"), t.identifier("Literal")),
+      expression: schemaGenerator.schema.enum(
         schema.enum.map((e) => t.stringLiteral(e as string))
       ),
       ...equivalentType(
@@ -298,60 +312,32 @@ const getBaseEffectSchema = Effect.fn(function* (
   switch (schema.type) {
     case "boolean": {
       return {
-        expression: t.memberExpression(
-          t.identifier("Schema"),
-          t.identifier("Boolean")
-        ),
+        expression: schemaGenerator.schema.boolean,
         ...equivalentType(t.tsBooleanKeyword()),
       };
     }
     case "string": {
       let expression: ExpressionWithType = {
-        expression: t.memberExpression(
-          t.identifier("Schema"),
-          t.identifier("String")
-        ),
+        expression: schemaGenerator.schema.string,
         ...equivalentType(t.tsStringKeyword()),
       };
       if (schema.pattern) {
-        expression.expression = t.callExpression(
-          t.memberExpression(expression.expression, t.identifier("pipe")),
-          [
-            t.callExpression(
-              t.memberExpression(
-                t.identifier("Schema"),
-                t.identifier("pattern")
-              ),
-              [t.regExpLiteral(schema.pattern)]
-            ),
-          ]
+        expression.expression = schemaGenerator.modifiers.regex(
+          expression.expression,
+          schema.pattern
         );
       }
       return expression;
     }
     case "number": {
       return {
-        expression: t.memberExpression(
-          t.identifier("Schema"),
-          t.identifier("Number")
-        ),
+        expression: schemaGenerator.schema.number,
         ...equivalentType(t.tsNumberKeyword()),
       };
     }
     case "integer": {
       return {
-        expression: t.callExpression(
-          t.memberExpression(
-            t.memberExpression(t.identifier("Schema"), t.identifier("Number")),
-            t.identifier("pipe")
-          ),
-          [
-            t.callExpression(
-              t.memberExpression(t.identifier("Schema"), t.identifier("int")),
-              []
-            ),
-          ]
-        ),
+        expression: schemaGenerator.schema.integer,
         ...equivalentType(t.tsNumberKeyword()),
       };
     }
@@ -374,14 +360,8 @@ const getBaseEffectSchema = Effect.fn(function* (
         decodedMember.readonly = !!propertySchema.typeMeta?.readonly;
         encodedMember.readonly = !!propertySchema.typeMeta?.readonly;
         if (!schema.required?.includes(propertyKey)) {
-          propertySchema.expression = t.callExpression(
-            t.memberExpression(propertySchema.expression, t.identifier("pipe")),
-            [
-              t.memberExpression(
-                t.identifier("Schema"),
-                t.identifier("optional")
-              ),
-            ]
+          propertySchema.expression = schemaGenerator.modifiers.optional(
+            propertySchema.expression
           );
           decodedMember.optional = true;
           encodedMember.optional = true;
@@ -398,10 +378,7 @@ const getBaseEffectSchema = Effect.fn(function* (
         objectTypeEncoded.members.push(encodedMember);
       }
       return {
-        expression: t.callExpression(
-          t.memberExpression(t.identifier("Schema"), t.identifier("Struct")),
-          [object]
-        ),
+        expression: t.callExpression(schemaGenerator.schema.object, [object]),
         typeDecoded: objectTypeDecoded,
         typeEncoded: objectTypeEncoded,
       };
@@ -409,19 +386,19 @@ const getBaseEffectSchema = Effect.fn(function* (
     case "array": {
       const itemsSchema = yield* getSchema(schema.items);
       let expression: t.Expression = t.callExpression(
-        t.memberExpression(t.identifier("Schema"), t.identifier("Array")),
+        schemaGenerator.schema.array,
         [itemsSchema.expression]
       );
       let typeDecoded: t.TSType = t.tsArrayType(itemsSchema.typeDecoded);
       let typeEncoded: t.TSType = t.tsArrayType(itemsSchema.typeEncoded);
-      if (itemsSchema.typeMeta?.readonly) {
-        typeDecoded = t.tsTypeOperator(typeDecoded, "readonly");
-        typeEncoded = t.tsTypeOperator(typeEncoded, "readonly");
-      } else {
-        expression = t.callExpression(
-          t.memberExpression(expression, t.identifier("pipe")),
-          [t.memberExpression(t.identifier("Schema"), t.identifier("mutable"))]
-        );
+      if (schemaGenerator.supportsImmutability) {
+        if (itemsSchema.typeMeta?.readonly) {
+          expression = schemaGenerator.modifiers.immutable(expression);
+          typeDecoded = t.tsTypeOperator(typeDecoded, "readonly");
+          typeEncoded = t.tsTypeOperator(typeEncoded, "readonly");
+        } else {
+          expression = schemaGenerator.modifiers.mutable(expression);
+        }
       }
       return {
         expression,
@@ -431,12 +408,15 @@ const getBaseEffectSchema = Effect.fn(function* (
     }
     case "null": {
       return {
-        expression: t.memberExpression(
-          t.identifier("Schema"),
-          t.identifier("Null")
-        ),
+        expression: schemaGenerator.schema.null,
         ...equivalentType(t.tsNullKeyword()),
       };
+    }
+    case undefined: {
+      return {
+        expression: schemaGenerator.schema.unknown,
+        ...equivalentType(t.tsUnknownKeyword()),
+      }
     }
     default: {
       console.info(schema);
@@ -451,15 +431,16 @@ const applyModifiers = Effect.fn(function* (
   expression: ExpressionWithType,
   schema: SchemaObject | ReferenceObject
 ) {
+  const schemaGenerator = yield* SchemaGeneratorContext;
+
   if ("$ref" in schema) return expression;
 
   const modified = { ...expression };
 
   // OpenAPI v3.0 support
   if ("nullable" in schema && schema.nullable) {
-    modified.expression = t.callExpression(
-      t.memberExpression(modified.expression, t.identifier("pipe")),
-      [t.memberExpression(t.identifier("Schema"), t.identifier("NullOr"))]
+    modified.expression = schemaGenerator.modifiers.nullable(
+      modified.expression
     );
     modified.typeDecoded = t.tsUnionType([
       modified.typeDecoded,
@@ -471,14 +452,18 @@ const applyModifiers = Effect.fn(function* (
     ]);
   }
 
-  if (schema.readOnly) {
-    modified.typeMeta ??= {};
-    modified.typeMeta.readonly = true;
-  } else {
-    modified.expression = t.callExpression(
-      t.memberExpression(modified.expression, t.identifier("pipe")),
-      [t.memberExpression(t.identifier("Schema"), t.identifier("mutable"))]
-    );
+  if (schemaGenerator.supportsImmutability) {
+    if (schema.readOnly) {
+      modified.expression = schemaGenerator.modifiers.immutable(
+        modified.expression
+      );
+      modified.typeMeta ??= {};
+      modified.typeMeta.readonly = true;
+    } else {
+      modified.expression = schemaGenerator.modifiers.mutable(
+        modified.expression
+      );
+    }
   }
 
   return modified;
@@ -487,12 +472,19 @@ const applyModifiers = Effect.fn(function* (
 const getSchema = Effect.fn(function* (
   schema: SchemaObject | ReferenceObject
 ): Generator<
-  YieldWrap<
-    Effect.Effect<ExpressionWithType, NotImplementedError, GeneratorContext>
-  >,
+  | YieldWrap<
+      Effect.Effect<
+        ExpressionWithType,
+        NotImplementedError,
+        GeneratorContext | SchemaGeneratorContext
+      >
+    >
+  | YieldWrap<Context.Tag<SchemaGeneratorContext, SchemaGenerator>>,
   ExpressionWithType,
   never
 > {
+  const schemaGenerator = yield* SchemaGeneratorContext;
+
   let schemas = [schema]
     .flatMap<SchemaObject | ReferenceObject>((schema) => {
       if ("$ref" in schema) return [schema];
@@ -524,8 +516,7 @@ const getSchema = Effect.fn(function* (
 
   if (expressions.length !== 1) {
     return {
-      expression: t.callExpression(
-        t.memberExpression(t.identifier("Schema"), t.identifier("Union")),
+      expression: schemaGenerator.schema.union(
         expressions.map((e) => e.expression)
       ),
       typeDecoded: t.tsUnionType(expressions.map((e) => e.typeDecoded)),
@@ -541,6 +532,7 @@ const getParametersSchema = Effect.fn(function* (
   method: OperationObject
 ) {
   const ctx = yield* GeneratorContext;
+  const schemaGenerator = yield* SchemaGeneratorContext;
   const identifier = t.identifier(`${operationId}_Parameters`);
   const object = t.objectExpression([]);
 
@@ -562,10 +554,7 @@ const getParametersSchema = Effect.fn(function* (
     }
     let expression = (yield* getSchema(parameter.schema)).expression;
     if (!parameter.required) {
-      expression = t.callExpression(
-        t.memberExpression(expression, t.identifier("pipe")),
-        [t.memberExpression(t.identifier("Schema"), t.identifier("optional"))]
-      );
+      expression = schemaGenerator.modifiers.optional(expression);
     }
     const objectProperty = t.objectProperty(
       t.identifier(parameter.name),
@@ -632,13 +621,10 @@ const getParametersSchema = Effect.fn(function* (
         object.properties.push(
           t.objectProperty(
             t.identifier("data"),
-            t.callExpression(
-              t.memberExpression(
-                t.identifier("Schema"),
-                t.identifier("parseJson")
-              ),
-              [(yield* getSchema(schema)).expression]
-            )
+            (
+              schemaGenerator.builtins.parseJson ??
+              defaultParseJson(schemaGenerator)
+            )((yield* getSchema(schema)).expression)
           )
         );
         break body;
@@ -646,13 +632,9 @@ const getParametersSchema = Effect.fn(function* (
         object.properties.push(
           t.objectProperty(
             t.identifier("data"),
-            t.callExpression(
-              t.memberExpression(
-                t.identifier("Schema"),
-                t.identifier("instanceOf")
-              ),
-              [t.identifier("Blob")]
-            )
+            t.callExpression(schemaGenerator.schema.instanceOf, [
+              t.identifier("Blob"),
+            ])
           )
         );
         break body;
@@ -665,75 +647,50 @@ const getParametersSchema = Effect.fn(function* (
     });
   }
 
-  const decodedSchema = t.callExpression(
-    t.memberExpression(t.identifier("Schema"), t.identifier("Struct")),
-    [object]
-  );
+  const decodedSchema = t.callExpression(schemaGenerator.schema.object, [
+    object,
+  ]);
 
-  const transform = t.callExpression(
-    t.memberExpression(t.identifier("Schema"), t.identifier("transform")),
-    [
-      t.identifier("ParametersSchema"),
-      decodedSchema,
-      t.objectExpression([
-        t.objectProperty(t.identifier("strict"), t.booleanLiteral(true)),
-        t.objectProperty(
-          t.identifier("decode"),
-          t.arrowFunctionExpression(
-            [],
-            t.blockStatement([
-              t.throwStatement(
-                t.newExpression(t.identifier("Error"), [
-                  t.stringLiteral("Not implemented"),
-                ])
-              ),
-            ])
-          )
-        ),
-
-        t.objectProperty(
-          t.identifier("encode"),
-          t.arrowFunctionExpression(
-            [t.identifier("from")],
-            t.objectExpression([
-              ...(queryArray.elements.length
-                ? [
-                    t.objectProperty(
-                      t.identifier("query"),
-                      t.newExpression(t.identifier("URLSearchParams"), [
-                        queryArray,
-                      ])
-                    ),
-                  ]
-                : []),
-              ...(pathObject.properties.length
-                ? [t.objectProperty(t.identifier("path"), pathObject)]
-                : []),
-              ...(headerArray.elements.length
-                ? [
-                    t.objectProperty(
-                      t.identifier("header"),
-                      t.newExpression(t.identifier("Headers"), [headerArray])
-                    ),
-                  ]
-                : []),
-              ...(hasBody
-                ? [
-                    t.objectProperty(
-                      t.identifier("body"),
-                      t.memberExpression(
-                        t.identifier("from"),
-                        t.identifier("data")
-                      )
-                    ),
-                  ]
-                : []),
-            ])
-          )
-        ),
-      ]),
-    ]
-  );
+  const transform = schemaGenerator.transformer({
+    encoded: t.identifier("ParametersSchema"),
+    decoded: decodedSchema,
+    decode: t.blockStatement([
+      t.throwStatement(
+        t.newExpression(t.identifier("Error"), [
+          t.stringLiteral("Not implemented"),
+        ])
+      ),
+    ]),
+    encode: t.objectExpression([
+      ...(queryArray.elements.length
+        ? [
+            t.objectProperty(
+              t.identifier("query"),
+              t.newExpression(t.identifier("URLSearchParams"), [queryArray])
+            ),
+          ]
+        : []),
+      ...(pathObject.properties.length
+        ? [t.objectProperty(t.identifier("path"), pathObject)]
+        : []),
+      ...(headerArray.elements.length
+        ? [
+            t.objectProperty(
+              t.identifier("header"),
+              t.newExpression(t.identifier("Headers"), [headerArray])
+            ),
+          ]
+        : []),
+      ...(hasBody
+        ? [
+            t.objectProperty(
+              t.identifier("body"),
+              t.memberExpression(t.identifier("from"), t.identifier("data"))
+            ),
+          ]
+        : []),
+    ]),
+  });
 
   ctx.schemas.set(identifier.name, [
     t.exportNamedDeclaration(
@@ -749,6 +706,8 @@ const getResponseSchema = Effect.fn(function* (
   operationId: string,
   method: OperationObject
 ) {
+  const schemaGenerator = yield* SchemaGeneratorContext;
+
   if (!method.responses?.["200"]) return null;
 
   if ("$ref" in method.responses["200"])
@@ -769,10 +728,9 @@ const getResponseSchema = Effect.fn(function* (
 
   const decodedSchema = (yield* getSchema(schema)).expression;
 
-  const transform = t.callExpression(
-    t.memberExpression(t.identifier("Schema"), t.identifier("parseJson")),
-    [decodedSchema]
-  );
+  const transform = (
+    schemaGenerator.builtins.parseJson ?? defaultParseJson(schemaGenerator)
+  )(decodedSchema);
 
   (yield* GeneratorContext).schemas.set(identifier.name, [
     t.exportNamedDeclaration(
@@ -787,6 +745,8 @@ const getResponseSchema = Effect.fn(function* (
 
 const build = Effect.fn(function* () {
   const ctx = yield* GeneratorContext;
+  const schemaGenerator = yield* SchemaGeneratorContext;
+
   for (const [pathKey, path] of Object.entries(ctx.document.paths ?? {})) {
     if (!path) continue;
     if (path.$ref) {
@@ -802,72 +762,87 @@ const build = Effect.fn(function* () {
         method.operationId ?? `${pathKey}_${methodKey}`
       );
 
-      const parametersSchema = yield* getParametersSchema(operationId, method);
+      const parametersSchema = yield* getParametersSchema(
+        operationId.upper,
+        method
+      );
 
-      const responseSchema = yield* getResponseSchema(operationId, method);
+      const responseSchema = yield* getResponseSchema(
+        operationId.upper,
+        method
+      );
 
       const parameters = t.identifier("parameters");
       parameters.typeAnnotation = t.tsTypeAnnotation(
         t.tsTypeReference(
-          t.tsQualifiedName(
-            t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
-            t.identifier("Type")
-          ),
+          schemaGenerator.types.typeDecoded,
           t.tsTypeParameterInstantiation([t.tsTypeQuery(parametersSchema)])
         )
       );
 
+      const isMutation = methodKey !== "get";
+
       const objectProperty = t.objectProperty(
-        t.identifier(operationId),
+        t.identifier(operationId.lower),
         t.arrowFunctionExpression(
-          [parameters],
-          t.callExpression(t.identifier("queryOptions"), [
-            t.objectExpression([
-              t.objectProperty(
-                t.identifier("queryKey"),
-                t.arrayExpression([t.stringLiteral(operationId), parameters])
-              ),
-              t.objectProperty(
-                t.identifier("queryFn"),
-                t.arrowFunctionExpression(
-                  [],
-                  t.awaitExpression(
-                    t.callExpression(t.identifier("makeRequest"), [
-                      t.objectExpression([
-                        t.objectProperty(
-                          t.identifier("method"),
-                          t.stringLiteral(methodKey)
-                        ),
-                        t.objectProperty(
-                          t.identifier("path"),
-                          t.stringLiteral(pathKey)
-                        ),
-                        t.objectProperty(
-                          t.identifier("parameterSchema"),
-                          parametersSchema
-                        ),
-                        t.objectProperty(
-                          t.identifier("parameters"),
+          isMutation ? [] : [parameters],
+          t.callExpression(
+            t.identifier(isMutation ? "mutationOptions" : "queryOptions"),
+            [
+              t.objectExpression([
+                ...(isMutation
+                  ? []
+                  : [
+                      t.objectProperty(
+                        t.identifier("queryKey"),
+                        t.arrayExpression([
+                          t.stringLiteral(operationId.upper),
                           parameters,
-                          false,
-                          true
-                        ),
-                        ...(responseSchema
-                          ? [
-                              t.objectProperty(
-                                t.identifier("responseSchema"),
-                                responseSchema
-                              ),
-                            ]
-                          : []),
-                      ]),
-                    ])
-                  ),
-                  true
-                )
-              ),
-            ]),
-          ])
+                        ])
+                      ),
+                    ]),
+                t.objectProperty(
+                  t.identifier(isMutation ? "mutationFn" : "queryFn"),
+                  t.arrowFunctionExpression(
+                    isMutation ? [parameters] : [],
+                    t.awaitExpression(
+                      t.callExpression(t.identifier("makeRequest"), [
+                        t.objectExpression([
+                          t.objectProperty(
+                            t.identifier("method"),
+                            t.stringLiteral(methodKey)
+                          ),
+                          t.objectProperty(
+                            t.identifier("path"),
+                            t.stringLiteral(pathKey)
+                          ),
+                          t.objectProperty(
+                            t.identifier("parameterSchema"),
+                            parametersSchema
+                          ),
+                          t.objectProperty(
+                            t.identifier("parameters"),
+                            parameters,
+                            false,
+                            true
+                          ),
+                          ...(responseSchema
+                            ? [
+                                t.objectProperty(
+                                  t.identifier("responseSchema"),
+                                  responseSchema
+                                ),
+                              ]
+                            : []),
+                        ]),
+                      ])
+                    ),
+                    true
+                  )
+                ),
+              ]),
+            ]
+          )
         )
       );
 
@@ -892,126 +867,46 @@ const build = Effect.fn(function* () {
       t.variableDeclaration("const", [
         t.variableDeclarator(
           t.identifier("ParametersSchema"),
-          t.callExpression(
-            t.memberExpression(t.identifier("Schema"), t.identifier("Struct")),
-            [
-              t.objectExpression([
-                t.objectProperty(
-                  t.identifier("query"),
-                  t.callExpression(
-                    t.memberExpression(
-                      t.callExpression(
-                        t.memberExpression(
-                          t.identifier("Schema"),
-                          t.identifier("instanceOf")
-                        ),
-                        [t.identifier("URLSearchParams")]
-                      ),
-                      t.identifier("pipe")
-                    ),
-                    [
-                      t.memberExpression(
-                        t.identifier("Schema"),
-                        t.identifier("optional")
-                      ),
-                    ]
+          t.callExpression(schemaGenerator.schema.object, [
+            t.objectExpression([
+              t.objectProperty(
+                t.identifier("query"),
+                schemaGenerator.modifiers.optional(
+                  t.callExpression(schemaGenerator.schema.instanceOf, [
+                    t.identifier("URLSearchParams"),
+                  ])
+                )
+              ),
+              t.objectProperty(
+                t.identifier("headers"),
+                schemaGenerator.modifiers.optional(
+                  t.callExpression(schemaGenerator.schema.instanceOf, [
+                    t.identifier("Headers"),
+                  ])
+                )
+              ),
+              t.objectProperty(
+                t.identifier("path"),
+                schemaGenerator.modifiers.optional(
+                  schemaGenerator.schema.record(
+                    schemaGenerator.schema.string,
+                    schemaGenerator.schema.string
                   )
-                ),
-                t.objectProperty(
-                  t.identifier("headers"),
-                  t.callExpression(
-                    t.memberExpression(
-                      t.callExpression(
-                        t.memberExpression(
-                          t.identifier("Schema"),
-                          t.identifier("instanceOf")
-                        ),
-                        [t.identifier("Headers")]
-                      ),
-                      t.identifier("pipe")
-                    ),
-                    [
-                      t.memberExpression(
-                        t.identifier("Schema"),
-                        t.identifier("optional")
-                      ),
-                    ]
-                  )
-                ),
-                t.objectProperty(
-                  t.identifier("path"),
-                  t.callExpression(
-                    t.memberExpression(
-                      t.callExpression(
-                        t.memberExpression(
-                          t.identifier("Schema"),
-                          t.identifier("Record")
-                        ),
-                        [
-                          t.objectExpression([
-                            t.objectProperty(
-                              t.identifier("key"),
-                              t.memberExpression(
-                                t.identifier("Schema"),
-                                t.identifier("String")
-                              )
-                            ),
-                            t.objectProperty(
-                              t.identifier("value"),
-                              t.memberExpression(
-                                t.identifier("Schema"),
-                                t.identifier("String")
-                              )
-                            ),
-                          ]),
-                        ]
-                      ),
-                      t.identifier("pipe")
-                    ),
-                    [
-                      t.memberExpression(
-                        t.identifier("Schema"),
-                        t.identifier("optional")
-                      ),
-                    ]
-                  )
-                ),
-                t.objectProperty(
-                  t.identifier("body"),
-                  t.callExpression(
-                    t.memberExpression(
-                      t.callExpression(
-                        t.memberExpression(
-                          t.identifier("Schema"),
-                          t.identifier("Union")
-                        ),
-                        [
-                          t.memberExpression(
-                            t.identifier("Schema"),
-                            t.identifier("String")
-                          ),
-                          t.callExpression(
-                            t.memberExpression(
-                              t.identifier("Schema"),
-                              t.identifier("instanceOf")
-                            ),
-                            [t.identifier("Blob")]
-                          ),
-                        ]
-                      ),
-                      t.identifier("pipe")
-                    ),
-                    [
-                      t.memberExpression(
-                        t.identifier("Schema"),
-                        t.identifier("optional")
-                      ),
-                    ]
-                  )
-                ),
-              ]),
-            ]
-          )
+                )
+              ),
+              t.objectProperty(
+                t.identifier("body"),
+                schemaGenerator.modifiers.optional(
+                  schemaGenerator.schema.union([
+                    schemaGenerator.schema.string,
+                    t.callExpression(schemaGenerator.schema.instanceOf, [
+                      t.identifier("Blob"),
+                    ]),
+                  ])
+                )
+              ),
+            ]),
+          ])
         ),
       ])
     ),
@@ -1030,7 +925,7 @@ const build = Effect.fn(function* () {
 });
 
 const getMakeRequest = Effect.fn(function* () {
-  const ctx = yield* GeneratorContext;
+  const schemaGenerator = yield* SchemaGeneratorContext;
   const optionsParam = t.objectPattern([
     t.objectProperty(
       t.identifier("method"),
@@ -1072,7 +967,7 @@ const getMakeRequest = Effect.fn(function* () {
         t.identifier("parameterSchema"),
         t.tsTypeAnnotation(
           t.tsTypeReference(
-            t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
+            schemaGenerator.types.schema,
             t.tsTypeParameterInstantiation([
               t.tsTypeReference(t.identifier("TParams")),
               t.tsTypeLiteral([
@@ -1111,7 +1006,7 @@ const getMakeRequest = Effect.fn(function* () {
           t.identifier("responseSchema"),
           t.tsTypeAnnotation(
             t.tsTypeReference(
-              t.tsQualifiedName(t.identifier("Schema"), t.identifier("Schema")),
+              schemaGenerator.types.schema,
               t.tsTypeParameterInstantiation([
                 t.tsTypeReference(t.identifier("TResponse")),
                 t.tsStringKeyword(),
@@ -1134,15 +1029,9 @@ const getMakeRequest = Effect.fn(function* () {
             t.objectProperty(t.identifier("query"), t.identifier("query")),
             t.objectProperty(t.identifier("body"), t.identifier("body")),
           ]),
-          t.callExpression(
-            t.callExpression(
-              t.memberExpression(
-                t.identifier("Schema"),
-                t.identifier("encodeSync")
-              ),
-              [t.identifier("parameterSchema")]
-            ),
-            [t.identifier("parameters")]
+          schemaGenerator.methods.encode(
+            t.identifier("parameterSchema"),
+            t.identifier("parameters")
           )
         ),
       ]),
@@ -1223,25 +1112,17 @@ const getMakeRequest = Effect.fn(function* () {
         t.blockStatement([t.returnStatement(t.nullLiteral())])
       ),
       t.returnStatement(
-        t.callExpression(
-          t.callExpression(
-            t.memberExpression(
-              t.identifier("Schema"),
-              t.identifier("decodeSync")
-            ),
-            [t.identifier("responseSchema")]
-          ),
-          [
-            t.awaitExpression(
-              t.callExpression(
-                t.memberExpression(
-                  t.identifier("response"),
-                  t.identifier("text")
-                ),
-                []
-              )
-            ),
-          ]
+        schemaGenerator.methods.decode(
+          t.identifier("responseSchema"),
+          t.awaitExpression(
+            t.callExpression(
+              t.memberExpression(
+                t.identifier("response"),
+                t.identifier("text")
+              ),
+              []
+            )
+          )
         )
       ),
     ]),
@@ -1260,19 +1141,27 @@ export const generate = Effect.fn(function* (
   document: APIDocument<object>,
   options: GeneratorOptions
 ) {
+  const schemaGenerator = getSchemaGenerator(options.schemas?.format ?? "zod");
+
   const context: GeneratorData = {
     document,
     options,
     imports: [
-      t.importDeclaration(
-        [t.importNamespaceSpecifier(t.identifier("Schema"))],
-        t.stringLiteral("effect/Schema")
-      ),
+      ...schemaGenerator.imports,
       t.importDeclaration(
         [
           t.importSpecifier(
             t.identifier("queryOptions"),
             t.identifier("queryOptions")
+          ),
+          t.importSpecifier(
+            t.identifier("mutationOptions"),
+            t.identifier("mutationOptions")
+          ),
+          t.importSpecifier(t.identifier("useQuery"), t.identifier("useQuery")),
+          t.importSpecifier(
+            t.identifier("useMutation"),
+            t.identifier("useMutation")
           ),
         ],
         t.stringLiteral("@tanstack/react-query")
@@ -1283,5 +1172,8 @@ export const generate = Effect.fn(function* (
     processingSchemaTypes: new Set(),
     apiMethods: [],
   };
-  return yield* build().pipe(Effect.provideService(GeneratorContext, context));
+  return yield* build().pipe(
+    Effect.provideService(GeneratorContext, context),
+    Effect.provideService(SchemaGeneratorContext, schemaGenerator)
+  );
 });

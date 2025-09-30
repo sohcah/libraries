@@ -2893,6 +2893,7 @@ __metadata:
     tsdown: "npm:^0.14.1"
     typescript: "npm:^5.9.2"
     vitest: "npm:^3.2.4"
+    zod: "npm:^4.1.11"
   bin:
     openapi-generator: ./dist/cli.js
   languageName: unknown
@@ -8571,6 +8572,13 @@ __metadata:
   version: 4.1.8
   resolution: "zod@npm:4.1.8"
   checksum: 10c0/5eae39da09d7bd0564a30dfd2348811e4e2e7dd15955d8f3444f8e196f35e5422b1482eda234b722fafb0738f4a8b718adb042b860936bfdd2cc19cdbdac8a9a
+  languageName: node
+  linkType: hard
+
+"zod@npm:^4.1.11":
+  version: 4.1.11
+  resolution: "zod@npm:4.1.11"
+  checksum: 10c0/ce6a4c4acfbf51d7dd0f2669c82f207d62a1f00264eef608994b94eb99d86a74c99f59b0dd3e61ef82909ee136631378b709e0908f0a02a2d5c21d0c497de5db
   languageName: node
   linkType: hard
 

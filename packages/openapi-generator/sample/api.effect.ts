@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, mutationOptions, useQuery, useMutation } from "@tanstack/react-query";
 export const ParametersSchema = Schema.Struct({
   query: Schema.instanceOf(URLSearchParams).pipe(Schema.optional),
   headers: Schema.instanceOf(Headers).pipe(Schema.optional),
@@ -68,10 +68,10 @@ export const AddPet_Parameters = Schema.transform(ParametersSchema, Schema.Struc
   data: Schema.parseJson(Pet)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     body: from.data
   })
 });
@@ -80,10 +80,10 @@ export const UpdatePet_Parameters = Schema.transform(ParametersSchema, Schema.St
   data: Schema.parseJson(Pet)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     body: from.data
   })
 });
@@ -92,10 +92,10 @@ export const FindPetsByStatus_Parameters = Schema.transform(ParametersSchema, Sc
   /** Status values that need to be considered for filter*/status: Schema.Literal("available", "pending", "sold").pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     query: new URLSearchParams([["status", String(from.status)]])
   })
 });
@@ -104,10 +104,10 @@ export const FindPetsByTags_Parameters = Schema.transform(ParametersSchema, Sche
   /** Tags to filter by*/tags: Schema.Array(Schema.String.pipe(Schema.mutable)).pipe(Schema.mutable).pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     query: new URLSearchParams([["tags", String(from.tags)]])
   })
 });
@@ -116,10 +116,10 @@ export const GetPetById_Parameters = Schema.transform(ParametersSchema, Schema.S
   /** ID of pet to return*/petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       petId: String(from.petId)
     }
@@ -132,10 +132,10 @@ export const UpdatePetWithForm_Parameters = Schema.transform(ParametersSchema, S
   /** Status of pet that needs to be updated*/status: Schema.String.pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     query: new URLSearchParams([["name", String(from.name)], ["status", String(from.status)]]),
     path: {
       petId: String(from.petId)
@@ -148,10 +148,10 @@ export const DeletePet_Parameters = Schema.transform(ParametersSchema, Schema.St
   /** Pet id to delete*/petId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       petId: String(from.petId)
     },
@@ -164,10 +164,10 @@ export const UploadFile_Parameters = Schema.transform(ParametersSchema, Schema.S
   data: Schema.instanceOf(Blob)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     query: new URLSearchParams([["additionalMetadata", String(from.additionalMetadata)]]),
     path: {
       petId: String(from.petId)
@@ -184,10 +184,10 @@ export type ApiResponse = Schema.Schema.Type<typeof ApiResponse>;
 export const UploadFile_Response = Schema.parseJson(ApiResponse);
 export const GetInventory_Parameters = Schema.transform(ParametersSchema, Schema.Struct({}), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({})
+  encode: (from, ctx) => ({})
 });
 export const GetInventory_Response = Schema.parseJson(Schema.Struct({}).pipe(Schema.mutable));
 export const Order = Schema.Struct({
@@ -203,10 +203,10 @@ export const PlaceOrder_Parameters = Schema.transform(ParametersSchema, Schema.S
   data: Schema.parseJson(Order)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     body: from.data
   })
 });
@@ -215,10 +215,10 @@ export const GetOrderById_Parameters = Schema.transform(ParametersSchema, Schema
   /** ID of order that needs to be fetched*/orderId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       orderId: String(from.orderId)
     }
@@ -229,10 +229,10 @@ export const DeleteOrder_Parameters = Schema.transform(ParametersSchema, Schema.
   /** ID of the order that needs to be deleted*/orderId: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       orderId: String(from.orderId)
     }
@@ -253,10 +253,10 @@ export const CreateUser_Parameters = Schema.transform(ParametersSchema, Schema.S
   data: Schema.parseJson(User)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     body: from.data
   })
 });
@@ -265,10 +265,10 @@ export const CreateUsersWithListInput_Parameters = Schema.transform(ParametersSc
   data: Schema.parseJson(Schema.Array(User).pipe(Schema.mutable).pipe(Schema.mutable))
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     body: from.data
   })
 });
@@ -278,29 +278,29 @@ export const LoginUser_Parameters = Schema.transform(ParametersSchema, Schema.St
   /** The password for login in clear text*/password: Schema.String.pipe(Schema.mutable).pipe(Schema.optional)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     query: new URLSearchParams([["username", String(from.username)], ["password", String(from.password)]])
   })
 });
 export const LoginUser_Response = Schema.parseJson(Schema.String.pipe(Schema.mutable));
 export const LogoutUser_Parameters = Schema.transform(ParametersSchema, Schema.Struct({}), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({})
+  encode: (from, ctx) => ({})
 });
 export const GetUserByName_Parameters = Schema.transform(ParametersSchema, Schema.Struct({
   /** The name that needs to be fetched. Use user1 for testing*/username: Schema.String.pipe(Schema.mutable)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       username: String(from.username)
     }
@@ -312,10 +312,10 @@ export const UpdateUser_Parameters = Schema.transform(ParametersSchema, Schema.S
   data: Schema.parseJson(User)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       username: String(from.username)
     },
@@ -326,10 +326,10 @@ export const DeleteUser_Parameters = Schema.transform(ParametersSchema, Schema.S
   /** The name that needs to be deleted*/username: Schema.String.pipe(Schema.mutable)
 }), {
   strict: true,
-  decode: () => {
+  decode: (from, ctx) => {
     throw new Error("Not implemented");
   },
-  encode: from => ({
+  encode: (from, ctx) => ({
     path: {
       username: String(from.username)
     }
@@ -341,9 +341,8 @@ export function useApi() {
     ### Add a new pet to the store.
     Add a new pet to the store.
     **/
-    AddPet: (parameters: Schema.Schema.Type<typeof AddPet_Parameters>) => queryOptions({
-      queryKey: ["AddPet", parameters],
-      queryFn: async () => await makeRequest({
+    addPet: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof AddPet_Parameters>) => await makeRequest({
         method: "post",
         path: "/pet",
         parameterSchema: AddPet_Parameters,
@@ -355,9 +354,8 @@ export function useApi() {
     ### Update an existing pet
     Update an existing pet by Id.
     **/
-    UpdatePet: (parameters: Schema.Schema.Type<typeof UpdatePet_Parameters>) => queryOptions({
-      queryKey: ["UpdatePet", parameters],
-      queryFn: async () => await makeRequest({
+    updatePet: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof UpdatePet_Parameters>) => await makeRequest({
         method: "put",
         path: "/pet",
         parameterSchema: UpdatePet_Parameters,
@@ -369,7 +367,7 @@ export function useApi() {
     ### Finds Pets by status.
     Multiple status values can be provided with comma separated strings.
     **/
-    FindPetsByStatus: (parameters: Schema.Schema.Type<typeof FindPetsByStatus_Parameters>) => queryOptions({
+    findPetsByStatus: (parameters: Schema.Schema.Type<typeof FindPetsByStatus_Parameters>) => queryOptions({
       queryKey: ["FindPetsByStatus", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -383,7 +381,7 @@ export function useApi() {
     ### Finds Pets by tags.
     Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing.
     **/
-    FindPetsByTags: (parameters: Schema.Schema.Type<typeof FindPetsByTags_Parameters>) => queryOptions({
+    findPetsByTags: (parameters: Schema.Schema.Type<typeof FindPetsByTags_Parameters>) => queryOptions({
       queryKey: ["FindPetsByTags", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -397,7 +395,7 @@ export function useApi() {
     ### Find pet by ID.
     Returns a single pet.
     **/
-    GetPetById: (parameters: Schema.Schema.Type<typeof GetPetById_Parameters>) => queryOptions({
+    getPetById: (parameters: Schema.Schema.Type<typeof GetPetById_Parameters>) => queryOptions({
       queryKey: ["GetPetById", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -411,9 +409,8 @@ export function useApi() {
     ### Updates a pet in the store with form data.
     Updates a pet resource based on the form data.
     **/
-    UpdatePetWithForm: (parameters: Schema.Schema.Type<typeof UpdatePetWithForm_Parameters>) => queryOptions({
-      queryKey: ["UpdatePetWithForm", parameters],
-      queryFn: async () => await makeRequest({
+    updatePetWithForm: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof UpdatePetWithForm_Parameters>) => await makeRequest({
         method: "post",
         path: "/pet/{petId}",
         parameterSchema: UpdatePetWithForm_Parameters,
@@ -425,9 +422,8 @@ export function useApi() {
     ### Deletes a pet.
     Delete a pet.
     **/
-    DeletePet: (parameters: Schema.Schema.Type<typeof DeletePet_Parameters>) => queryOptions({
-      queryKey: ["DeletePet", parameters],
-      queryFn: async () => await makeRequest({
+    deletePet: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof DeletePet_Parameters>) => await makeRequest({
         method: "delete",
         path: "/pet/{petId}",
         parameterSchema: DeletePet_Parameters,
@@ -438,9 +434,8 @@ export function useApi() {
     ### Uploads an image.
     Upload image of the pet.
     **/
-    UploadFile: (parameters: Schema.Schema.Type<typeof UploadFile_Parameters>) => queryOptions({
-      queryKey: ["UploadFile", parameters],
-      queryFn: async () => await makeRequest({
+    uploadFile: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof UploadFile_Parameters>) => await makeRequest({
         method: "post",
         path: "/pet/{petId}/uploadImage",
         parameterSchema: UploadFile_Parameters,
@@ -452,7 +447,7 @@ export function useApi() {
     ### Returns pet inventories by status.
     Returns a map of status codes to quantities.
     **/
-    GetInventory: (parameters: Schema.Schema.Type<typeof GetInventory_Parameters>) => queryOptions({
+    getInventory: (parameters: Schema.Schema.Type<typeof GetInventory_Parameters>) => queryOptions({
       queryKey: ["GetInventory", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -466,9 +461,8 @@ export function useApi() {
     ### Place an order for a pet.
     Place a new order in the store.
     **/
-    PlaceOrder: (parameters: Schema.Schema.Type<typeof PlaceOrder_Parameters>) => queryOptions({
-      queryKey: ["PlaceOrder", parameters],
-      queryFn: async () => await makeRequest({
+    placeOrder: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof PlaceOrder_Parameters>) => await makeRequest({
         method: "post",
         path: "/store/order",
         parameterSchema: PlaceOrder_Parameters,
@@ -480,7 +474,7 @@ export function useApi() {
     ### Find purchase order by ID.
     For valid response try integer IDs with value <= 5 or > 10. Other values will generate exceptions.
     **/
-    GetOrderById: (parameters: Schema.Schema.Type<typeof GetOrderById_Parameters>) => queryOptions({
+    getOrderById: (parameters: Schema.Schema.Type<typeof GetOrderById_Parameters>) => queryOptions({
       queryKey: ["GetOrderById", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -494,9 +488,8 @@ export function useApi() {
     ### Delete purchase order by identifier.
     For valid response try integer IDs with value < 1000. Anything above 1000 or non-integers will generate API errors.
     **/
-    DeleteOrder: (parameters: Schema.Schema.Type<typeof DeleteOrder_Parameters>) => queryOptions({
-      queryKey: ["DeleteOrder", parameters],
-      queryFn: async () => await makeRequest({
+    deleteOrder: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof DeleteOrder_Parameters>) => await makeRequest({
         method: "delete",
         path: "/store/order/{orderId}",
         parameterSchema: DeleteOrder_Parameters,
@@ -507,9 +500,8 @@ export function useApi() {
     ### Create user.
     This can only be done by the logged in user.
     **/
-    CreateUser: (parameters: Schema.Schema.Type<typeof CreateUser_Parameters>) => queryOptions({
-      queryKey: ["CreateUser", parameters],
-      queryFn: async () => await makeRequest({
+    createUser: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof CreateUser_Parameters>) => await makeRequest({
         method: "post",
         path: "/user",
         parameterSchema: CreateUser_Parameters,
@@ -521,9 +513,8 @@ export function useApi() {
     ### Creates list of users with given input array.
     Creates list of users with given input array.
     **/
-    CreateUsersWithListInput: (parameters: Schema.Schema.Type<typeof CreateUsersWithListInput_Parameters>) => queryOptions({
-      queryKey: ["CreateUsersWithListInput", parameters],
-      queryFn: async () => await makeRequest({
+    createUsersWithListInput: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof CreateUsersWithListInput_Parameters>) => await makeRequest({
         method: "post",
         path: "/user/createWithList",
         parameterSchema: CreateUsersWithListInput_Parameters,
@@ -535,7 +526,7 @@ export function useApi() {
     ### Logs user into the system.
     Log into the system.
     **/
-    LoginUser: (parameters: Schema.Schema.Type<typeof LoginUser_Parameters>) => queryOptions({
+    loginUser: (parameters: Schema.Schema.Type<typeof LoginUser_Parameters>) => queryOptions({
       queryKey: ["LoginUser", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -549,7 +540,7 @@ export function useApi() {
     ### Logs out current logged in user session.
     Log user out of the system.
     **/
-    LogoutUser: (parameters: Schema.Schema.Type<typeof LogoutUser_Parameters>) => queryOptions({
+    logoutUser: (parameters: Schema.Schema.Type<typeof LogoutUser_Parameters>) => queryOptions({
       queryKey: ["LogoutUser", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -562,7 +553,7 @@ export function useApi() {
     ### Get user by user name.
     Get user detail based on username.
     **/
-    GetUserByName: (parameters: Schema.Schema.Type<typeof GetUserByName_Parameters>) => queryOptions({
+    getUserByName: (parameters: Schema.Schema.Type<typeof GetUserByName_Parameters>) => queryOptions({
       queryKey: ["GetUserByName", parameters],
       queryFn: async () => await makeRequest({
         method: "get",
@@ -576,9 +567,8 @@ export function useApi() {
     ### Update user resource.
     This can only be done by the logged in user.
     **/
-    UpdateUser: (parameters: Schema.Schema.Type<typeof UpdateUser_Parameters>) => queryOptions({
-      queryKey: ["UpdateUser", parameters],
-      queryFn: async () => await makeRequest({
+    updateUser: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof UpdateUser_Parameters>) => await makeRequest({
         method: "put",
         path: "/user/{username}",
         parameterSchema: UpdateUser_Parameters,
@@ -589,9 +579,8 @@ export function useApi() {
     ### Delete user resource.
     This can only be done by the logged in user.
     **/
-    DeleteUser: (parameters: Schema.Schema.Type<typeof DeleteUser_Parameters>) => queryOptions({
-      queryKey: ["DeleteUser", parameters],
-      queryFn: async () => await makeRequest({
+    deleteUser: () => mutationOptions({
+      mutationFn: async (parameters: Schema.Schema.Type<typeof DeleteUser_Parameters>) => await makeRequest({
         method: "delete",
         path: "/user/{username}",
         parameterSchema: DeleteUser_Parameters,
@@ -600,3 +589,79 @@ export function useApi() {
     })
   };
 }
+export const useAddPet = () => {
+  const api = useApi();
+  return useMutation(api.addPet());
+};
+export const useUpdatePet = () => {
+  const api = useApi();
+  return useMutation(api.updatePet());
+};
+export const useFindPetsByStatus = (parameters: Schema.Schema.Type<typeof FindPetsByStatus_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.findPetsByStatus(parameters));
+};
+export const useFindPetsByTags = (parameters: Schema.Schema.Type<typeof FindPetsByTags_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.findPetsByTags(parameters));
+};
+export const useGetPetById = (parameters: Schema.Schema.Type<typeof GetPetById_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.getPetById(parameters));
+};
+export const useUpdatePetWithForm = () => {
+  const api = useApi();
+  return useMutation(api.updatePetWithForm());
+};
+export const useDeletePet = () => {
+  const api = useApi();
+  return useMutation(api.deletePet());
+};
+export const useUploadFile = () => {
+  const api = useApi();
+  return useMutation(api.uploadFile());
+};
+export const useGetInventory = (parameters: Schema.Schema.Type<typeof GetInventory_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.getInventory(parameters));
+};
+export const usePlaceOrder = () => {
+  const api = useApi();
+  return useMutation(api.placeOrder());
+};
+export const useGetOrderById = (parameters: Schema.Schema.Type<typeof GetOrderById_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.getOrderById(parameters));
+};
+export const useDeleteOrder = () => {
+  const api = useApi();
+  return useMutation(api.deleteOrder());
+};
+export const useCreateUser = () => {
+  const api = useApi();
+  return useMutation(api.createUser());
+};
+export const useCreateUsersWithListInput = () => {
+  const api = useApi();
+  return useMutation(api.createUsersWithListInput());
+};
+export const useLoginUser = (parameters: Schema.Schema.Type<typeof LoginUser_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.loginUser(parameters));
+};
+export const useLogoutUser = (parameters: Schema.Schema.Type<typeof LogoutUser_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.logoutUser(parameters));
+};
+export const useGetUserByName = (parameters: Schema.Schema.Type<typeof GetUserByName_Parameters>) => {
+  const api = useApi();
+  return useQuery(api.getUserByName(parameters));
+};
+export const useUpdateUser = () => {
+  const api = useApi();
+  return useMutation(api.updateUser());
+};
+export const useDeleteUser = () => {
+  const api = useApi();
+  return useMutation(api.deleteUser());
+};
