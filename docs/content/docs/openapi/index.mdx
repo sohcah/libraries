@@ -18,10 +18,19 @@ npm install @tanstack/react-query zod
 
 ```ts title="openapi.config.ts"
 import { defineConfig } from "@sohcah/openapi-generator/config";
+import {
+  createReactQueryClientGenerator,
+  createZodSchemaGenerator,
+} from "@sohcah/openapi-generator/generators";
 
 export default defineConfig({
   schema: "swagger.json",
   output: "src/api.ts",
+  generators: [
+    createReactQueryClientGenerator({
+      schema: createZodSchemaGenerator({}),
+    }),
+  ],
 });
 ```
 

@@ -13,6 +13,8 @@
   "bin": "./dist/cli.js",
   "exports": {
     ".": "./dist/index.js",
+    "./config": "./dist/config.js",
+    "./generators": "./dist/generators/index.js",
     "./package.json": "./package.json"
   },
   "engines": {
