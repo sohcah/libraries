@@ -1,0 +1,44 @@
+# Getting Started
+
+## Installation
+
+```package-install
+npm install --save-dev @sohcah/openapi-generator
+```
+
+### Peer Dependencies
+
+The generated source from the OpenAPI Generator requires `@tanstack/react-query` and `zod`.
+
+```package-install
+npm install @tanstack/react-query zod
+```
+
+## Usage
+
+```ts title="openapi.config.ts"
+import { defineConfig } from "@sohcah/openapi-generator/config";
+import {
+  createReactQueryClientGenerator,
+  createZodSchemaGenerator,
+} from "@sohcah/openapi-generator/generators";
+
+export default defineConfig({
+  schema: "swagger.json",
+  output: "src/api.ts",
+  generators: [
+    createReactQueryClientGenerator({
+      schema: createZodSchemaGenerator({}),
+    }),
+  ],
+});
+```
+
+```json title="package.json"
+{
+  "scripts": {
+    "openapi-build": "openapi-generator build",
+    "openapi-dev": "openapi-generator watch"
+  }
+}
+```

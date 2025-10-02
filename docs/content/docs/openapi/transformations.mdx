@@ -1,0 +1,90 @@
+# Custom Transformations
+
+## Effect
+
+## `date-time` String to `Temporal.Instant`
+
+```ts title="openapi.config.ts"
+import { defineConfig } from "@sohcah/openapi-generator/config";
+import {
+  createReactQueryClientGenerator,
+  createEffectSchemaGenerator,
+} from "@sohcah/openapi-generator/generators";
+
+export default defineConfig({
+  schema: "swagger.json",
+  output: "src/api.ts",
+  generators: [
+    createReactQueryClientGenerator({
+      schema: createEffectSchemaGenerator({
+        custom(schema) {
+          if (schema.type === "string" && schema.format === "date-time") {
+            return {
+              type: "import",
+              name: "instant",
+              from: "./api.schemas.js",
+            };
+          }
+          return null;
+        },
+      }),
+    }),
+  ],
+});
+```
+
+```ts title="src/api.schemas.ts"
+import { Schema } from "effect";
+import { Temporal } from "@js-temporal/polyfill";
+
+export const instant = () => Schema.String.pipe(
+  Schema.transform(Schema.instanceOf(Temporal.Instant), {
+    strict: true,
+    decode: (str) => Temporal.Instant.from(str),
+    encode: (date) => date.toString(),
+  })
+);
+```
+
+## Zod
+
+## `date-time` String to `Temporal.Instant`
+
+```ts title="openapi.config.ts"
+import { defineConfig } from "@sohcah/openapi-generator/config";
+import {
+  createReactQueryClientGenerator,
+  createZodSchemaGenerator,
+} from "@sohcah/openapi-generator/generators";
+
+export default defineConfig({
+  schema: "swagger.json",
+  output: "src/api.ts",
+  generators: [
+    createReactQueryClientGenerator({
+      schema: createZodSchemaGenerator({
+        custom(schema) {
+          if (schema.type === "string" && schema.format === "date-time") {
+            return {
+              type: "import",
+              name: "zInstant",
+              from: "./api.schemas.js",
+            };
+          }
+          return null;
+        },
+      }),
+    }),
+  ],
+});
+```
+
+```ts title="src/api.schemas.ts"
+import { z } from "zod";
+import { Temporal } from "@js-temporal/polyfill";
+
+export const zInstant = () => z.codec(z.string(), z.instanceOf(Temporal.Instant), {
+  decode: (str) => Temporal.Instant.from(str),
+  encode: (date) => date.toString(),
+});
+```

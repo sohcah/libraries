@@ -1,0 +1,68 @@
+{
+  "name": "@sohcah/openapi-generator",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sam Hindess <mail@sohcah.dev>",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "openapi-generator": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./config": {
+      "default": "./dist/config.js",
+      "types": "./dist/config.d.ts"
+    },
+    "./generators": {
+      "default": "./dist/generators/index.js",
+      "types": "./dist/generators/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest --run",
+    "cli": "./dist/cli.js",
+    "sample": "yarn build && yarn cli generate -c ./sample/openapi.config.ts && SCHEMA_FORMAT=effect yarn cli generate -c ./sample/openapi.config.ts && SCHEMA_FORMAT=zod-mini yarn cli generate -c ./sample/openapi.config.ts"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.85.3",
+    "@types/babel__generator": "^7.27.0",
+    "@types/node": "^24.3.0",
+    "openapi-types": "^12.1.3",
+    "tsdown": "^0.14.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.28.3",
+    "@effect/cli": "^0.69.0",
+    "@effect/cluster": "^0.48.0",
+    "@effect/experimental": "^0.54.6",
+    "@effect/platform": "^0.90.3",
+    "@effect/platform-node": "^0.96.0",
+    "@effect/printer-ansi": "^0.45.0",
+    "@effect/rpc": "^0.69.0",
+    "@effect/sql": "^0.44.1",
+    "@effect/typeclass": "^0.36.0",
+    "@readme/openapi-parser": "^5.0.1",
+    "effect": "^3.17.7",
+    "zod": "^4.1.11"
+  },
+  "volta": {
+    "extends": "../../package.json"
+  }
+}
