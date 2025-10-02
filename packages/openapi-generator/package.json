@@ -10,11 +10,22 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": "./dist/cli.js",
+  "bin": {
+    "openapi-generator": "./dist/cli.js"
+  },
   "exports": {
-    ".": "./dist/index.js",
-    "./config": "./dist/config.js",
-    "./generators": "./dist/generators/index.js",
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./config": {
+      "default": "./dist/config.js",
+      "types": "./dist/config.d.ts"
+    },
+    "./generators": {
+      "default": "./dist/generators/index.js",
+      "types": "./dist/generators/index.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "engines": {
