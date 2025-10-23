@@ -252,10 +252,19 @@ export function createReactQueryClientGenerator(
                       : [
                           t.objectProperty(
                             t.identifier("queryKey"),
-                            t.arrayExpression([
-                              t.stringLiteral(operationKey.upper),
-                              parameters,
-                            ])
+                            t.tsAsExpression(
+                              t.arrayExpression([
+                                t.stringLiteral(operationKey.upper),
+                                parameters,
+                              ]),
+                              t.tsTypeReference(
+                                yield* generationHelpers.ensureImport(
+                                  "QueryKey",
+                                  "@tanstack/react-query",
+                                  true
+                                )
+                              )
+                            )
                           ),
                         ]),
                     t.objectProperty(
