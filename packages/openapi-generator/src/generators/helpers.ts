@@ -3,7 +3,11 @@ import { DocumentContext } from "../context.js";
 import * as t from "@babel/types";
 import { NotImplementedError } from "../errors.js";
 
-export const ensureImport = Effect.fn(function* (name: string, from: string) {
+export const ensureImport = Effect.fn(function* (
+  name: string,
+  from: string,
+  typeOnly: boolean = false
+) {
   const ctx = yield* DocumentContext;
 
   const identifier = t.identifier(name);
@@ -15,7 +19,9 @@ export const ensureImport = Effect.fn(function* (name: string, from: string) {
         (s) => s.type === "ImportSpecifier" && s.local.name === name
       )
     ) {
-      existingImport.specifiers.push(t.importSpecifier(identifier, identifier));
+      const specifier = t.importSpecifier(identifier, identifier);
+      if (typeOnly) specifier.importKind = "type";
+      existingImport.specifiers.push(specifier);
     }
     return identifier;
   }
@@ -29,7 +35,10 @@ export const ensureImport = Effect.fn(function* (name: string, from: string) {
   return identifier;
 });
 
-export const ensureNamespaceImport = Effect.fn(function* (name: string, from: string) {
+export const ensureNamespaceImport = Effect.fn(function* (
+  name: string,
+  from: string
+) {
   const ctx = yield* DocumentContext;
 
   const identifier = t.identifier(name);
