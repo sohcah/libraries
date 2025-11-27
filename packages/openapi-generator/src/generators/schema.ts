@@ -855,7 +855,7 @@ export function createSchemaGenerator(
   const processOperation = Effect.fn(function* (
     operationKey: generationHelpers.OperationKey,
     _path: string,
-    _method: "get" | "post" | "put" | "delete",
+    _method: generationHelpers.HttpMethod,
     operation: OperationObject
   ) {
     if (options.includeOperations) {

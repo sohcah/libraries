@@ -187,7 +187,7 @@ export function createReactQueryClientGenerator(
           parametersSchema.typeReference
         );
 
-        const isMutation = method !== "get";
+        const isMutation = method !== "get" && method !== "head" && method !== "options";
 
         const fnBody = t.awaitExpression(
           t.callExpression(

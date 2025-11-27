@@ -81,3 +81,16 @@ export type OperationKey = {
   lower: string;
   upper: string;
 };
+
+export const httpMethods = [
+  "get",
+  "post",
+  "put",
+  "delete",
+  "options",
+  "head",
+  "patch",
+  "trace"
+] as const;
+
+export type HttpMethod = (typeof httpMethods)[number];

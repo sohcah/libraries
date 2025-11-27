@@ -19,7 +19,7 @@ export interface OpenApiGenerator {
   processOperation?: (
     operationKey: generationHelpers.OperationKey,
     path: string,
-    method: "get" | "post" | "put" | "delete",
+    method: generationHelpers.HttpMethod,
     operation: OperationObject
   ) => Effect.Effect<void, NotImplementedError, DocumentContext>;
 }
