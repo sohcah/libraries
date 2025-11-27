@@ -26,7 +26,7 @@ const build = Effect.fn(function* (options: GeneratorOptions) {
         message: "$ref in path",
       });
     }
-    for (const methodKey of ["get", "post", "put", "delete"] as const) {
+    for (const methodKey of generationHelpers.httpMethods) {
       const method = path[methodKey];
       if (!method) continue;
 
