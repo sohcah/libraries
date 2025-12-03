@@ -2888,8 +2888,10 @@ __metadata:
     "@tanstack/react-query": "npm:^5.85.3"
     "@types/babel__generator": "npm:^7.27.0"
     "@types/node": "npm:^24.3.0"
+    "@types/regex-escape": "npm:^3"
     effect: "npm:^3.17.7"
     openapi-types: "npm:^12.1.3"
+    regex-escape: "npm:^3.4.11"
     tsdown: "npm:^0.14.1"
     typescript: "npm:^5.9.2"
     vitest: "npm:^3.2.4"
@@ -3411,6 +3413,13 @@ __metadata:
   dependencies:
     csstype: "npm:^3.0.2"
   checksum: 10c0/75e35b54883f5ed07d3b5cb16a4711b6dbb7ec6b74301bcb9bfa697c9d9fff022ec508e1719e7b2c69e2e8b042faac1125be7717b5e5e084f816a2c88e136920
+  languageName: node
+  linkType: hard
+
+"@types/regex-escape@npm:^3":
+  version: 3.4.1
+  resolution: "@types/regex-escape@npm:3.4.1"
+  checksum: 10c0/6f6d1a01a37df6c368dd6df9720b4e013cf40c76dc4c24688c2982260608821e0d1d8ddfe7335386a3393599dfbf343e0f3b9a08beac818c3ee7e8ab16f24f7a
   languageName: node
   linkType: hard
 
@@ -7019,6 +7028,13 @@ __metadata:
     indent-string: "npm:^4.0.0"
     strip-indent: "npm:^3.0.0"
   checksum: 10c0/d64a6b5c0b50eb3ddce3ab770f866658a2b9998c678f797919ceb1b586bab9259b311407280bd80b804e2a7c7539b19238ae6a2a20c843f1a7fcff21d48c2eae
+  languageName: node
+  linkType: hard
+
+"regex-escape@npm:^3.4.11":
+  version: 3.4.11
+  resolution: "regex-escape@npm:3.4.11"
+  checksum: 10c0/8eac8cec83709536001d00c5954988841e9b0c33939c4af435ff7876761488a80edfcff024fc0fa9afd1032a96041570c688407d28735fab44265a110f40fb41
   languageName: node
   linkType: hard
 

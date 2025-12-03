@@ -35,9 +35,12 @@ export interface OpenApiResponseSchema {
 }
 
 export interface OpenApiSchemaGenerator extends OpenApiGenerator {
+  decodeResponse: (schema: t.Expression, response: t.Expression) => Effect.Effect<t.Expression>;
+  encodeParameters: (schema: t.Expression, parameters: t.Expression) => Effect.Effect<t.Expression>;
   ensureParametersSchema: (
     operationKey: generationHelpers.OperationKey,
-    operation: OperationObject
+    operation: OperationObject,
+    path: string
   ) => Effect.Effect<
     OpenApiParametersSchema,
     NotImplementedError,
@@ -47,7 +50,7 @@ export interface OpenApiSchemaGenerator extends OpenApiGenerator {
     operationKey: generationHelpers.OperationKey,
     operation: OperationObject
   ) => Effect.Effect<
-    OpenApiResponseSchema | null,
+    OpenApiResponseSchema,
     NotImplementedError,
     DocumentContext
   >;

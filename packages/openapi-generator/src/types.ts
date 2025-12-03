@@ -9,3 +9,7 @@ export type ReferenceObject = OpenAPIV3.ReferenceObject | OpenAPIV3_1.ReferenceO
 export type SchemaObject = OpenAPIV3.SchemaObject | OpenAPIV3_1.SchemaObject;
 
 export type OperationObject = OpenAPIV3_1.OperationObject | OpenAPIV3.OperationObject;
+
+export type ResponseObject = OpenAPIV3.ResponseObject | OpenAPIV3_1.ResponseObject;
+
+export type MediaTypeObject = OpenAPIV3.MediaTypeObject | OpenAPIV3_1.MediaTypeObject;

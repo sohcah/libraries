@@ -10,10 +10,6 @@ import { DocumentContext } from "../context.js";
 
 export interface OpenApiClientGeneratorOptions {
   schema: OpenApiSchemaGenerator;
-  /**
-   * If provided, responses from the
-   */
-  responseGeneric?: ImportReference;
 }
 
 export function createReactQueryClientGenerator(
@@ -22,107 +18,49 @@ export function createReactQueryClientGenerator(
   const ensureApi = Effect.fn(function* () {
     const ctx = yield* DocumentContext;
     if (!ctx.schemas.has("Api")) {
-      const makeRequest = t.identifier("makeRequest");
-      const makeRequestOptions = t.identifier("options");
-      makeRequestOptions.typeAnnotation = t.tsTypeAnnotation(
+      const fetch = t.identifier("fetch");
+      const fetchPath = t.identifier("path");
+      fetchPath.typeAnnotation = t.tsTypeAnnotation(t.tsStringKeyword());
+      const fetchOptions = t.identifier("options");
+      fetchOptions.typeAnnotation = t.tsTypeAnnotation(
         t.tsTypeLiteral([
           t.tsPropertySignature(
             t.identifier("method"),
             t.tsTypeAnnotation(t.tsStringKeyword())
           ),
-          t.tsPropertySignature(
-            t.identifier("path"),
-            t.tsTypeAnnotation(t.tsStringKeyword())
-          ),
-          t.tsPropertySignature(
-            t.identifier("parametersSchema"),
-            t.tsTypeAnnotation(
-              t.tsTypeReference(
-                options.schema.schemaType,
-                t.tsTypeParameterInstantiation([
-                  t.tsTypeReference(t.identifier("TParams")),
-                  t.tsTypeLiteral([
-                    Object.assign(
-                      t.tsPropertySignature(
-                        t.identifier("query"),
-                        t.tsTypeAnnotation(
-                          t.tsTypeReference(t.identifier("URLSearchParams"))
-                        )
-                      ),
-                      { optional: true }
-                    ),
-                    Object.assign(
-                      t.tsPropertySignature(
-                        t.identifier("body"),
-                        t.tsTypeAnnotation(
-                          t.tsUnionType([
-                            t.tsStringKeyword(),
-                            t.tsTypeReference(t.identifier("Blob")),
-                          ])
-                        )
-                      ),
-                      { optional: true }
-                    ),
-                    Object.assign(
-                      t.tsPropertySignature(
-                        t.identifier("headers"),
-                        t.tsTypeAnnotation(
-                          t.tsTypeReference(t.identifier("Headers"))
-                        )
-                      ),
-                      { optional: true }
-                    ),
-                    Object.assign(
-                      t.tsPropertySignature(
-                        t.identifier("path"),
-                        t.tsTypeAnnotation(
-                          t.tsTypeReference(
-                            t.identifier("Record<string, string>")
-                          )
-                        )
-                      ),
-                      { optional: true }
-                    ),
-                  ]),
-                ])
-              )
-            )
-          ),
-          t.tsPropertySignature(
-            t.identifier("parameters"),
-            t.tsTypeAnnotation(t.tsTypeReference(t.identifier("TParams")))
+          Object.assign(
+            t.tsPropertySignature(
+              t.identifier("headers"),
+              t.tsTypeAnnotation(t.tsTypeReference(t.identifier("Headers")))
+            ),
+            { optional: true }
           ),
           Object.assign(
             t.tsPropertySignature(
-              t.identifier("responseSchema"),
+              t.identifier("body"),
               t.tsTypeAnnotation(
-                t.tsTypeReference(
-                  options.schema.schemaType,
-                  t.tsTypeParameterInstantiation([
-                    t.tsTypeReference(t.identifier("TResponse")),
-                    t.tsStringKeyword(),
-                  ])
-                )
+                t.tsUnionType([
+                  t.tsTypeReference(t.identifier("string")),
+                  t.tsTypeReference(t.identifier("Blob")),
+                  t.tsTypeReference(t.identifier("FormData")),
+                  t.tsTypeReference(t.identifier("URLSearchParams")),
+                ])
               )
             ),
             { optional: true }
           ),
         ])
       );
-      makeRequest.typeAnnotation = t.tsTypeAnnotation(
+      fetch.typeAnnotation = t.tsTypeAnnotation(
         t.tsFunctionType(
-          t.tsTypeParameterDeclaration([
-            t.tsTypeParameter(null, null, "TParams"),
-            t.tsTypeParameter(null, null, "TResponse"),
-          ]),
-          [makeRequestOptions],
+          null,
+          [fetchPath, fetchOptions],
           t.tsTypeAnnotation(
             t.tsTypeReference(
-              t.identifier(
-                options.responseGeneric
-                  ? `Promise<${(yield* generationHelpers.ensureImport(options.responseGeneric.name, options.responseGeneric.from)).name}<TResponse>>`
-                  : "Promise<TResponse>"
-              )
+              t.identifier("Promise"),
+              t.tsTypeParameterInstantiation([
+                t.tsTypeReference(t.identifier("Response")),
+              ])
             )
           )
         )
@@ -133,20 +71,20 @@ export function createReactQueryClientGenerator(
             t.identifier("Api"),
             null,
             t.classBody([
-              t.classPrivateProperty(t.privateName(makeRequest)),
+              t.classPrivateProperty(t.privateName(fetch)),
               t.classMethod(
                 "constructor",
                 t.identifier("constructor"),
-                [makeRequest],
+                [fetch],
                 t.blockStatement([
                   t.expressionStatement(
                     t.assignmentExpression(
                       "=",
                       t.memberExpression(
                         t.thisExpression(),
-                        t.privateName(makeRequest)
+                        t.privateName(fetch)
                       ),
-                      makeRequest
+                      fetch
                     )
                   ),
                 ])
@@ -170,11 +108,10 @@ export function createReactQueryClientGenerator(
     }),
     processOperation: Effect.fn(
       function* (operationKey, path, method, operation) {
-        const ctx = yield* DocumentContext;
-
         const parametersSchema = yield* options.schema.ensureParametersSchema(
           operationKey,
-          operation
+          operation,
+          path
         );
 
         const responseSchema = yield* options.schema.ensureResponseSchema(
@@ -187,36 +124,36 @@ export function createReactQueryClientGenerator(
           parametersSchema.typeReference
         );
 
-        const isMutation = method !== "get" && method !== "head" && method !== "options";
+        const isMutation =
+          method !== "get" && method !== "head" && method !== "options";
 
-        const fnBody = t.awaitExpression(
+        const fetchCall = t.awaitExpression(
           t.callExpression(
             t.memberExpression(
               t.thisExpression(),
-              t.privateName(t.identifier("makeRequest"))
+              t.privateName(t.identifier("fetch"))
             ),
             [
+              t.memberExpression(t.identifier("params"), t.identifier("path")),
               t.objectExpression([
                 t.objectProperty(
                   t.identifier("method"),
                   t.stringLiteral(method)
                 ),
-                t.objectProperty(t.identifier("path"), t.stringLiteral(path)),
                 t.objectProperty(
-                  t.identifier("parametersSchema"),
-                  parametersSchema.expression,
-                  false,
-                  true
+                  t.identifier("headers"),
+                  t.memberExpression(
+                    t.identifier("params"),
+                    t.identifier("headers")
+                  )
                 ),
-                t.objectProperty(t.identifier("parameters"), parameters),
-                ...(responseSchema
-                  ? [
-                      t.objectProperty(
-                        t.identifier("responseSchema"),
-                        responseSchema.expression
-                      ),
-                    ]
-                  : []),
+                t.objectProperty(
+                  t.identifier("body"),
+                  t.memberExpression(
+                    t.identifier("params"),
+                    t.identifier("body")
+                  )
+                ),
               ]),
             ]
           )
@@ -226,7 +163,30 @@ export function createReactQueryClientGenerator(
           "method",
           t.identifier(operationKey.lower),
           [parameters],
-          t.blockStatement([t.returnStatement(fnBody)]),
+          t.blockStatement([
+            t.variableDeclaration("const", [
+              t.variableDeclarator(
+                t.identifier("params"),
+                t.awaitExpression(
+                  yield* options.schema.encodeParameters(
+                    parametersSchema.expression,
+                    t.identifier("parameters")
+                  )
+                )
+              ),
+            ]),
+            t.variableDeclaration("const", [
+              t.variableDeclarator(t.identifier("response"), fetchCall),
+            ]),
+            t.returnStatement(
+              t.awaitExpression(
+                yield* options.schema.decodeResponse(
+                  responseSchema.expression,
+                  t.identifier("response")
+                )
+              )
+            ),
+          ]),
           false,
           false,
           false,
