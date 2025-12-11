@@ -139,7 +139,10 @@ export function createReactQueryClientGenerator(
         );
 
         const isMutation =
-          method !== "get" && method !== "head" && method !== "options";
+          method !== "get" &&
+          method !== "head" &&
+          method !== "options" &&
+          !operation.tags?.some((i) => i.toLowerCase() === "query");
 
         const fetchCall = t.awaitExpression(
           t.callExpression(
