@@ -12,26 +12,21 @@ export const ensureImport = Effect.fn(function* (
 
   const identifier = t.identifier(name);
 
-  const existingImport = ctx.imports.find((i) => i.source.value === from);
-  if (existingImport) {
-    if (
-      !existingImport.specifiers.find(
-        (s) => s.type === "ImportSpecifier" && s.local.name === name
-      )
-    ) {
-      const specifier = t.importSpecifier(identifier, identifier);
-      if (typeOnly) specifier.importKind = "type";
-      existingImport.specifiers.push(specifier);
-    }
-    return identifier;
+  let existingImport = ctx.imports.find((i) => i.source.value === from);
+  if (!existingImport) {
+    existingImport = t.importDeclaration([], t.stringLiteral(from));
+    ctx.imports.push(existingImport);
+  }
+  if (
+    !existingImport.specifiers.find(
+      (s) => s.type === "ImportSpecifier" && s.local.name === name
+    )
+  ) {
+    const specifier = t.importSpecifier(identifier, identifier);
+    if (typeOnly) specifier.importKind = "type";
+    existingImport.specifiers.push(specifier);
   }
 
-  ctx.imports.push(
-    t.importDeclaration(
-      [t.importSpecifier(identifier, identifier)],
-      t.stringLiteral(from)
-    )
-  );
   return identifier;
 });
 
@@ -90,15 +85,13 @@ export const httpMethods = [
   "options",
   "head",
   "patch",
-  "trace"
+  "trace",
 ] as const;
 
 export type HttpMethod = (typeof httpMethods)[number];
 
 export const notImplementedStatement = t.blockStatement([
   t.throwStatement(
-    t.newExpression(t.identifier("Error"), [
-      t.stringLiteral("Not implemented"),
-    ])
+    t.newExpression(t.identifier("Error"), [t.stringLiteral("Not implemented")])
   ),
 ]);
