@@ -260,7 +260,7 @@ export function createReactQueryClientGenerator(
                           )
                         )
                       : t.objectProperty(
-                          t.identifier(isMutation ? "mutationFn" : "queryFn"),
+                          t.identifier("queryFn"),
                           t.conditionalExpression(
                             t.binaryExpression(
                               "===",
