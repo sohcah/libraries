@@ -124,8 +124,25 @@ export function createReactQueryClientGenerator(
           parametersSchema.typeReference
         );
 
+        const parametersWithSkipToken = t.identifier("parameters");
+        parametersWithSkipToken.typeAnnotation = t.tsTypeAnnotation(
+          t.tsUnionType([
+            parametersSchema.typeReference,
+            t.tsTypeReference(
+              yield* generationHelpers.ensureImport(
+                "SkipToken",
+                "@tanstack/react-query",
+                true
+              )
+            ),
+          ])
+        );
+
         const isMutation =
-          method !== "get" && method !== "head" && method !== "options";
+          method !== "get" &&
+          method !== "head" &&
+          method !== "options" &&
+          !operation.tags?.some((i) => i.toLowerCase() === "query");
 
         const fetchCall = t.awaitExpression(
           t.callExpression(
@@ -197,7 +214,7 @@ export function createReactQueryClientGenerator(
           t.identifier(
             operationKey.lower + (isMutation ? "Mutation" : "Query")
           ),
-          isMutation ? [] : [parameters],
+          isMutation ? [] : [parametersWithSkipToken],
           t.blockStatement([
             t.returnStatement(
               t.callExpression(
@@ -215,7 +232,7 @@ export function createReactQueryClientGenerator(
                             t.tsAsExpression(
                               t.arrayExpression([
                                 t.stringLiteral(operationKey.upper),
-                                parameters,
+                                parametersWithSkipToken,
                               ]),
                               t.tsTypeReference(
                                 yield* generationHelpers.ensureImport(
@@ -227,20 +244,49 @@ export function createReactQueryClientGenerator(
                             )
                           ),
                         ]),
-                    t.objectProperty(
-                      t.identifier(isMutation ? "mutationFn" : "queryFn"),
-                      t.arrowFunctionExpression(
-                        isMutation ? [parameters] : [],
-                        t.callExpression(
-                          t.memberExpression(
-                            t.thisExpression(),
-                            t.identifier(operationKey.lower)
-                          ),
-                          [parameters]
+                    isMutation
+                      ? t.objectProperty(
+                          t.identifier("mutationFn"),
+                          t.arrowFunctionExpression(
+                            [parameters],
+                            t.callExpression(
+                              t.memberExpression(
+                                t.thisExpression(),
+                                t.identifier(operationKey.lower)
+                              ),
+                              [parameters]
+                            ),
+                            true
+                          )
+                        )
+                      : t.objectProperty(
+                          t.identifier("queryFn"),
+                          t.conditionalExpression(
+                            t.binaryExpression(
+                              "===",
+                              parametersWithSkipToken,
+                              yield* generationHelpers.ensureImport(
+                                "skipToken",
+                                "@tanstack/react-query"
+                              )
+                            ),
+                            yield* generationHelpers.ensureImport(
+                              "skipToken",
+                              "@tanstack/react-query"
+                            ),
+                            t.arrowFunctionExpression(
+                              [],
+                              t.callExpression(
+                                t.memberExpression(
+                                  t.thisExpression(),
+                                  t.identifier(operationKey.lower)
+                                ),
+                                [parametersWithSkipToken]
+                              ),
+                              true
+                            )
+                          )
                         ),
-                        true
-                      )
-                    ),
                   ]),
                 ]
               )
