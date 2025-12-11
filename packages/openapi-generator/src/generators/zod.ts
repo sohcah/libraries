@@ -94,7 +94,7 @@ export const createZodSchemaGenerator = ({
           []
         ),
       },
-      transformer: ({ encoded, decoded, decode, encode }) =>
+      transformer: ({ encoded, decoded, decode, decodeAsync, encode, encodeAsync }) =>
         t.callExpression(t.memberExpression(z, t.identifier("codec")), [
           encoded,
           decoded,
@@ -103,14 +103,16 @@ export const createZodSchemaGenerator = ({
               t.identifier("decode"),
               t.arrowFunctionExpression(
                 [t.identifier("from"), t.identifier("ctx")],
-                decode
+                decode,
+                decodeAsync
               )
             ),
             t.objectProperty(
               t.identifier("encode"),
               t.arrowFunctionExpression(
                 [t.identifier("from"), t.identifier("ctx")],
-                encode
+                encode,
+                encodeAsync
               )
             ),
           ]),
@@ -148,21 +150,20 @@ export const createZodSchemaGenerator = ({
             t.memberExpression(t.identifier("z"), t.identifier("NEVER"))
           ),
         ]),
-      builtins: {},
       methods: {
         encode: (schema: t.Expression, value: t.Expression) =>
           t.callExpression(
-            t.memberExpression(t.identifier("z"), t.identifier("encode")),
+            t.memberExpression(t.identifier("z"), t.identifier("encodeAsync")),
             [schema, value]
           ),
         decode: (schema: t.Expression, value: t.Expression) =>
           t.callExpression(
-            t.memberExpression(t.identifier("z"), t.identifier("decode")),
+            t.memberExpression(t.identifier("z"), t.identifier("decodeAsync")),
             [schema, value]
           ),
         parse: (schema: t.Expression, value: t.Expression) =>
           t.callExpression(
-            t.memberExpression(t.identifier("z"), t.identifier("parse")),
+            t.memberExpression(t.identifier("z"), t.identifier("parseAsync")),
             [schema, value]
           ),
       },

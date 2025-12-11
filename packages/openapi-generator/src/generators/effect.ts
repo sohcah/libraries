@@ -109,9 +109,43 @@ export const createEffectSchemaGenerator = (
         t.identifier("Unknown")
       ),
     },
-    transformer: ({ encoded, decoded, decode, encode }) =>
-      t.callExpression(
-        t.memberExpression(t.identifier("Schema"), t.identifier("transform")),
+    transformer: ({
+      encoded,
+      decoded,
+      decode,
+      decodeAsync,
+      encode,
+      encodeAsync,
+    }) => {
+      let decodeFn: t.Expression | undefined;
+      let encodeFn: t.Expression | undefined;
+      if (decodeAsync || encodeAsync) {
+        decodeFn = t.arrowFunctionExpression(
+          [t.identifier("from"), t.identifier("ctx")],
+          t.callExpression(
+            t.memberExpression(
+              t.identifier("Effect"),
+              t.identifier("promise")
+            ),
+            [t.arrowFunctionExpression([], decode, true)]
+          )
+        );
+        encodeFn = t.arrowFunctionExpression(
+          [t.identifier("from"), t.identifier("ctx")],
+          t.callExpression(
+            t.memberExpression(
+              t.identifier("Effect"),
+              t.identifier("promise")
+            ),
+            [t.arrowFunctionExpression([], encode, true)]
+          )
+        );
+      } else {
+        decodeFn = t.arrowFunctionExpression([t.identifier("from"), t.identifier("ctx")], decode);
+        encodeFn = t.arrowFunctionExpression([t.identifier("from"), t.identifier("ctx")], encode);
+      }
+      return t.callExpression(
+        t.memberExpression(t.identifier("Schema"), t.identifier(decodeAsync || encodeAsync ? "transformOrFail" : "transform")),
         [
           encoded,
           decoded,
@@ -119,37 +153,25 @@ export const createEffectSchemaGenerator = (
             t.objectProperty(t.identifier("strict"), t.booleanLiteral(true)),
             t.objectProperty(
               t.identifier("decode"),
-              t.arrowFunctionExpression(
-                [t.identifier("from"), t.identifier("ctx")],
-                decode
-              )
+              decodeFn
             ),
             t.objectProperty(
               t.identifier("encode"),
-              t.arrowFunctionExpression(
-                [t.identifier("from"), t.identifier("ctx")],
-                encode
-              )
+              encodeFn
             ),
           ]),
         ]
-      ),
+      );
+    },
     transformerCatch: (expression) =>
       t.blockStatement([t.throwStatement(expression)]),
-    builtins: {
-      parseJson: (expression) =>
-        t.callExpression(
-          t.memberExpression(t.identifier("Schema"), t.identifier("parseJson")),
-          [expression]
-        ),
-    },
     methods: {
       encode: (schema: t.Expression, value: t.Expression) =>
         t.callExpression(
           t.callExpression(
             t.memberExpression(
               t.identifier("Schema"),
-              t.identifier("encodeSync")
+              t.identifier("encodePromise")
             ),
             [schema]
           ),
@@ -160,7 +182,7 @@ export const createEffectSchemaGenerator = (
           t.callExpression(
             t.memberExpression(
               t.identifier("Schema"),
-              t.identifier("decodeSync")
+              t.identifier("decodePromise")
             ),
             [schema]
           ),
@@ -169,7 +191,10 @@ export const createEffectSchemaGenerator = (
       parse: (schema: t.Expression, value: t.Expression) =>
         t.callExpression(
           t.callExpression(
-            t.memberExpression(t.identifier("Schema"), t.identifier("decodeUnknownSync")),
+            t.memberExpression(
+              t.identifier("Schema"),
+              t.identifier("decodeUnknownPromise")
+            ),
             [schema]
           ),
           [value]
@@ -179,5 +204,6 @@ export const createEffectSchemaGenerator = (
   }),
   initialize: Effect.fn(function* () {
     yield* generationHelpers.ensureNamespaceImport("Schema", "effect/Schema");
+    yield* generationHelpers.ensureImport("Effect", "effect");
   }),
 });

@@ -94,3 +94,11 @@ export const httpMethods = [
 ] as const;
 
 export type HttpMethod = (typeof httpMethods)[number];
+
+export const notImplementedStatement = t.blockStatement([
+  t.throwStatement(
+    t.newExpression(t.identifier("Error"), [
+      t.stringLiteral("Not implemented"),
+    ])
+  ),
+]);

@@ -1,15 +1,22 @@
 import * as t from "@babel/types";
 import type {
+  MediaTypeObject,
   OperationObject,
   ReferenceObject,
+  ResponseObject,
   SchemaObject,
 } from "../types.js";
-import { Effect } from "effect";
-import { DocumentContext } from "../context.js";
+import { Context, Effect } from "effect";
+import { DocumentContext, type DocumentContextData } from "../context.js";
 import * as generationHelpers from "./helpers.js";
 import type { YieldWrap } from "effect/Utils";
 import type { ImportReference, OpenApiSchemaGenerator } from "./types.js";
 import { NotImplementedError } from "../errors.js";
+import { generateJsonRequestCodec } from "./requestFormats/json.js";
+import { generateFormDataRequestCodec } from "./requestFormats/formData.js";
+import { generatePathExpression } from "./generatePathExpression.js";
+import { generateJsonResponseCodec } from "./responseFormats/json.js";
+import { generateBlobResponseCodec } from "./responseFormats/blob.js";
 
 export interface SchemaGeneratorOptions {
   /** @default null */
@@ -60,12 +67,11 @@ export interface DefaultSchemaGeneratorOptions extends SchemaGeneratorOptions {
     encoded: t.Expression;
     decoded: t.Expression;
     decode: t.Expression | t.BlockStatement;
+    decodeAsync?: boolean;
     encode: t.Expression | t.BlockStatement;
+    encodeAsync?: boolean;
   }) => t.Expression;
   transformerCatch: (expression: t.Expression) => t.BlockStatement;
-  builtins: {
-    parseJson?: (expression: t.Expression) => t.Expression;
-  };
   methods: {
     encode: (schema: t.Expression, value: t.Expression) => t.Expression;
     decode: (schema: t.Expression, value: t.Expression) => t.Expression;
@@ -89,37 +95,55 @@ const equivalentType = (type: t.TSType) => ({
   typeEncoded: type,
 });
 
-function defaultParseJson(
-  options: DefaultSchemaGeneratorOptions
-): (expression: t.Expression) => t.Expression {
-  return (expression) =>
-    options.transformer({
-      encoded: options.schema.string,
-      decoded: expression,
-      decode: t.blockStatement([
-        t.tryStatement(
-          t.blockStatement([
-            t.returnStatement(
-              t.callExpression(
-                t.memberExpression(t.identifier("JSON"), t.identifier("parse")),
-                [t.identifier("from")]
-              )
-            ),
-          ]),
-          t.catchClause(
-            Object.assign(t.identifier("error"), {
-              typeAnnotation: t.tsTypeAnnotation(t.tsUnknownKeyword()),
-            }),
-            options.transformerCatch(t.identifier("error"))
-          )
-        ),
-      ]),
-      encode: t.callExpression(
-        t.memberExpression(t.identifier("JSON"), t.identifier("stringify")),
-        [t.identifier("from")]
-      ),
-    });
-}
+export const resolveSchema = Effect.fn(function* (
+  schema: SchemaObject | ReferenceObject
+): Generator<
+  | YieldWrap<Effect.Effect<SchemaObject, NotImplementedError, DocumentContext>>
+  | YieldWrap<Context.Tag<DocumentContext, DocumentContextData>>,
+  SchemaObject,
+  never
+> {
+  const ctx = yield* DocumentContext;
+  let resolvedSchema = schema;
+  for (let i = 0; i < 10; i++) {
+    if (!("$ref" in resolvedSchema))
+      return resolvedSchema satisfies SchemaObject as SchemaObject;
+    const ref = resolvedSchema.$ref;
+    if (!ref.startsWith("#/components/schemas/"))
+      return yield* new NotImplementedError({
+        message: `$ref ${ref}`,
+      });
+    const schemaName = ref.slice("#/components/schemas/".length);
+
+    const nextSchema = ctx.document.components?.schemas?.[schemaName];
+    if (!nextSchema) {
+      return yield* new NotImplementedError({
+        message: `Missing $ref ${ref}`,
+      });
+    }
+    resolvedSchema = nextSchema;
+  }
+  return yield* new NotImplementedError({
+    message: `Too many $ref in schema`,
+  });
+});
+
+const stringLiteralOrIdentifier = (value: string) => {
+  if (value.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
+    return t.identifier(value);
+  }
+  return t.stringLiteral(value);
+};
+
+const memberExpressionWithStringProperty = (
+  object: t.Expression,
+  property: string
+) => {
+  if (property.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
+    return t.memberExpression(object, t.identifier(property));
+  }
+  return t.memberExpression(object, t.stringLiteral(property), true);
+};
 
 export function createSchemaGenerator(
   options: DefaultSchemaGeneratorOptions
@@ -134,14 +158,7 @@ export function createSchemaGenerator(
               t.identifier("ParametersSchema"),
               t.callExpression(options.schema.object, [
                 t.objectExpression([
-                  t.objectProperty(
-                    t.identifier("query"),
-                    options.modifiers.optional(
-                      t.callExpression(options.schema.instanceOf, [
-                        t.identifier("URLSearchParams"),
-                      ])
-                    )
-                  ),
+                  t.objectProperty(t.identifier("path"), options.schema.string),
                   t.objectProperty(
                     t.identifier("headers"),
                     options.modifiers.optional(
@@ -151,21 +168,18 @@ export function createSchemaGenerator(
                     )
                   ),
                   t.objectProperty(
-                    t.identifier("path"),
-                    options.modifiers.optional(
-                      options.schema.record(
-                        options.schema.string,
-                        options.schema.string
-                      )
-                    )
-                  ),
-                  t.objectProperty(
                     t.identifier("body"),
                     options.modifiers.optional(
                       options.schema.union([
                         options.schema.string,
                         t.callExpression(options.schema.instanceOf, [
                           t.identifier("Blob"),
+                        ]),
+                        t.callExpression(options.schema.instanceOf, [
+                          t.identifier("FormData"),
+                        ]),
+                        t.callExpression(options.schema.instanceOf, [
+                          t.identifier("URLSearchParams"),
                         ]),
                       ])
                     )
@@ -322,7 +336,9 @@ export function createSchemaGenerator(
       } else {
         return {
           expression: options.modifiers.optional(options.schema.unknown),
-          ...equivalentType(t.tsUnionType([t.tsUnknownKeyword(), t.tsUndefinedKeyword()])),
+          ...equivalentType(
+            t.tsUnionType([t.tsUnknownKeyword(), t.tsUndefinedKeyword()])
+          ),
           typeMeta,
         };
       }
@@ -355,21 +371,34 @@ export function createSchemaGenerator(
 
     if (schema.enum) {
       const unsupportedEnumValue = schema.enum.find(
-        (i) => typeof i !== "string"
+        (i) =>
+          typeof i !== "string" &&
+          typeof i !== "number" &&
+          typeof i !== "boolean" &&
+          i !== null
       );
       if (unsupportedEnumValue !== undefined) {
         return yield* new NotImplementedError({
           message: `Unsupported 'enum' value: ${JSON.stringify(unsupportedEnumValue)}`,
         });
       }
+      const getLiteral = (value: unknown) => {
+        if (typeof value === "number") {
+          return t.numericLiteral(value);
+        }
+        if (typeof value === "boolean") {
+          return t.booleanLiteral(value);
+        }
+        return t.stringLiteral(value as string);
+      };
       return {
         expression: options.schema.enum(
-          schema.enum.map((e) => t.stringLiteral(e as string))
+          schema.enum.map((e) => (e === null ? t.nullLiteral() : getLiteral(e)))
         ),
         ...equivalentType(
           t.tsUnionType(
             schema.enum.map((e) =>
-              t.tsLiteralType(t.stringLiteral(e as string))
+              e === null ? t.tsNullKeyword() : t.tsLiteralType(getLiteral(e))
             )
           )
         ),
@@ -386,6 +415,16 @@ export function createSchemaGenerator(
         };
       }
       case "string": {
+        if (schema.format === "binary") {
+          return {
+            expression: t.callExpression(options.schema.instanceOf, [
+              t.identifier("Blob"),
+            ]),
+            ...equivalentType(t.tsTypeReference(t.identifier("Blob"))),
+            typeMeta,
+          };
+        }
+
         let expression: ExpressionWithType = {
           expression: options.schema.string,
           ...equivalentType(t.tsStringKeyword()),
@@ -431,7 +470,10 @@ export function createSchemaGenerator(
           );
           decodedMember.readonly = !!propertySchema.typeMeta?.readonly;
           encodedMember.readonly = !!propertySchema.typeMeta?.readonly;
-          if (propertySchema.typeMeta?.optional || !schema.required?.includes(propertyKey)) {
+          if (
+            propertySchema.typeMeta?.optional ||
+            !schema.required?.includes(propertyKey)
+          ) {
             propertySchema.expression = options.modifiers.optional(
               propertySchema.expression
             );
@@ -439,7 +481,7 @@ export function createSchemaGenerator(
             encodedMember.optional = true;
           }
           const objectProperty = t.objectProperty(
-            t.identifier(propertyKey),
+            stringLiteralOrIdentifier(propertyKey),
             propertySchema.expression
           );
           if (property.description) {
@@ -592,22 +634,36 @@ export function createSchemaGenerator(
 
   const ensureParametersSchema = Effect.fn(function* (
     operationKey: generationHelpers.OperationKey,
-    method: OperationObject
+    method: OperationObject,
+    path: string
   ) {
     const ctx = yield* DocumentContext;
     const identifier = t.identifier(`${operationKey.upper}_Parameters`);
     const object = t.objectExpression([]);
 
     const queryArray = t.arrayExpression([]);
-    const pathObject = t.objectExpression([]);
+    const pathParameters: Record<string, t.Expression> = {};
     const headerArray = t.arrayExpression([]);
     let hasBody = false;
 
-    for (const parameter of method.parameters ?? []) {
+    for (let parameter of method.parameters ?? []) {
       if ("$ref" in parameter) {
-        return yield* new NotImplementedError({
-          message: "$ref in parameter",
-        });
+        const newParameter =
+          ctx.document.components?.parameters?.[
+            parameter.$ref.slice("#/components/parameters/".length)
+          ];
+        if (newParameter) {
+          parameter = newParameter;
+        } else {
+          return yield* new NotImplementedError({
+            message: "Unresolved $ref in parameter",
+          });
+        }
+        if ("$ref" in parameter) {
+          return yield* new NotImplementedError({
+            message: "$ref in parameter",
+          });
+        }
       }
       if (!parameter.schema) {
         return yield* new NotImplementedError({
@@ -619,7 +675,7 @@ export function createSchemaGenerator(
         expression = options.modifiers.optional(expression);
       }
       const objectProperty = t.objectProperty(
-        t.identifier(parameter.name),
+        stringLiteralOrIdentifier(parameter.name),
         expression
       );
       if (parameter.description) {
@@ -627,39 +683,45 @@ export function createSchemaGenerator(
       }
       object.properties.push(objectProperty);
       if (parameter.in === "query") {
-        const param = t.memberExpression(
+        const param = memberExpressionWithStringProperty(
           t.identifier("from"),
-          t.identifier(parameter.name)
+          parameter.name
         );
+        // TODO: Share formData request format logic
         if ("type" in parameter.schema && parameter.schema.type === "array") {
           queryArray.elements.push(
             t.spreadElement(
               t.logicalExpression(
                 "??",
-              Object.assign(
-                t.optionalCallExpression(
-                  t.optionalMemberExpression(param, t.identifier("map"), false, true),
-                  [
-                    t.arrowFunctionExpression(
-                      [t.identifier("value")],
-                      t.arrayExpression([
-                        t.stringLiteral(parameter.name),
-                        t.callExpression(t.identifier("String"), [
-                          t.identifier("value"),
-                        ]),
-                      ])
+                Object.assign(
+                  t.optionalCallExpression(
+                    t.optionalMemberExpression(
+                      param,
+                      t.identifier("map"),
+                      false,
+                      true
                     ),
-                  ],
-                  false,
+                    [
+                      t.arrowFunctionExpression(
+                        [t.identifier("value")],
+                        t.arrayExpression([
+                          t.stringLiteral(parameter.name),
+                          t.callExpression(t.identifier("String"), [
+                            t.identifier("value"),
+                          ]),
+                        ])
+                      ),
+                    ],
+                    false
+                  ),
+                  {
+                    typeParameters: t.tsTypeParameterInstantiation([
+                      t.tsTupleType([t.tsStringKeyword(), t.tsStringKeyword()]),
+                    ]),
+                  }
                 ),
-                {
-                  typeParameters: t.tsTypeParameterInstantiation([
-                    t.tsTypeReference(t.identifier("[string, string]")),
-                  ]),
-                }
-              ),
-              t.arrayExpression([])
-            ),
+                t.arrayExpression([])
+              )
             )
           );
         } else {
@@ -671,25 +733,18 @@ export function createSchemaGenerator(
           );
         }
       } else if (parameter.in === "path") {
-        pathObject.properties.push(
-          t.objectProperty(
-            t.identifier(parameter.name),
-            t.callExpression(t.identifier("String"), [
-              t.memberExpression(
-                t.identifier("from"),
-                t.identifier(parameter.name)
-              ),
-            ])
-          )
+        pathParameters[parameter.name] = memberExpressionWithStringProperty(
+          t.identifier("from"),
+          parameter.name
         );
       } else if (parameter.in === "header") {
         headerArray.elements.push(
           t.arrayExpression([
             t.stringLiteral(parameter.name),
             t.callExpression(t.identifier("String"), [
-              t.memberExpression(
+              memberExpressionWithStringProperty(
                 t.identifier("from"),
-                t.identifier(parameter.name)
+                parameter.name
               ),
             ]),
           ])
@@ -701,43 +756,11 @@ export function createSchemaGenerator(
       }
     }
 
-    body: if (method.requestBody) {
-      if ("$ref" in method.requestBody) {
-        return yield* new NotImplementedError({
-          message: "$ref in requestBody",
-        });
-      }
-      // console.info(method.requestBody);
-      for (const contentKey in method.requestBody.content) {
-        hasBody = true;
-        const schema = method.requestBody.content[contentKey]?.schema;
-        if (!!schema && contentKey === "application/json") {
-          object.properties.push(
-            t.objectProperty(
-              t.identifier("data"),
-              (options.builtins.parseJson ?? defaultParseJson(options))(
-                (yield* ensureSchema(schema)).expression
-              )
-            )
-          );
-          break body;
-        } else if (contentKey === "application/octet-stream") {
-          object.properties.push(
-            t.objectProperty(
-              t.identifier("data"),
-              t.callExpression(options.schema.instanceOf, [
-                t.identifier("Blob"),
-              ])
-            )
-          );
-          break body;
-        }
-      }
-      return yield* new NotImplementedError({
-        message: `No supported requestBody type (${Object.keys(
-          method.requestBody.content
-        ).join(", ")})`,
-      });
+    const body = yield* requestBodySchema(operationKey, method);
+    if (body) {
+      hasBody = true;
+      object.properties.push(t.objectProperty(t.identifier("data"), body.data));
+      headerArray.elements.push(...body.headers);
     }
 
     const decodedSchema = t.callExpression(options.schema.object, [object]);
@@ -753,21 +776,20 @@ export function createSchemaGenerator(
         ),
       ]),
       encode: t.objectExpression([
-        ...(queryArray.elements.length
-          ? [
-              t.objectProperty(
-                t.identifier("query"),
-                t.newExpression(t.identifier("URLSearchParams"), [queryArray])
-              ),
-            ]
-          : []),
-        ...(pathObject.properties.length
-          ? [t.objectProperty(t.identifier("path"), pathObject)]
-          : []),
+        t.objectProperty(
+          t.identifier("path"),
+          generatePathExpression(
+            path,
+            pathParameters,
+            queryArray.elements.length
+              ? t.newExpression(t.identifier("URLSearchParams"), [queryArray])
+              : null
+          )
+        ),
         ...(headerArray.elements.length
           ? [
               t.objectProperty(
-                t.identifier("header"),
+                t.identifier("headers"),
                 t.newExpression(t.identifier("Headers"), [headerArray])
               ),
             ]
@@ -800,35 +822,149 @@ export function createSchemaGenerator(
     };
   });
 
+  const requestBodySchema = Effect.fn(function* (
+    operationKey: generationHelpers.OperationKey,
+    method: OperationObject
+  ) {
+    if (!method.requestBody) {
+      return null;
+    }
+
+    if ("$ref" in method.requestBody) {
+      return yield* new NotImplementedError({
+        message: "$ref in requestBody",
+      });
+    }
+
+    let hasBody = false;
+
+    for (const contentType in method.requestBody.content) {
+      hasBody = true;
+      const schema = method.requestBody.content[contentType]?.schema;
+      if (contentType === "application/json") {
+        if (!schema) continue;
+        return {
+          headers: [
+            t.arrayExpression([
+              t.stringLiteral("Content-Type"),
+              t.stringLiteral("application/json"),
+            ]),
+          ],
+          data: yield* generateJsonRequestCodec(
+            options,
+            yield* resolveSchema(schema),
+            (yield* ensureSchema(schema)).expression
+          ),
+        };
+      } else if (contentType === "multipart/form-data") {
+        if (!schema) continue;
+        return {
+          headers: [],
+          data: yield* generateFormDataRequestCodec(
+            options,
+            yield* resolveSchema(schema),
+            (yield* ensureSchema(schema)).expression
+          ),
+        };
+      } else {
+        if (
+          schema &&
+          ("$ref" in schema ||
+            (schema.type !== "string" && schema.format !== "binary"))
+        ) {
+          continue;
+        }
+        return {
+          headers: [
+            t.arrayExpression([
+              t.stringLiteral("Content-Type"),
+              t.stringLiteral(contentType),
+            ]),
+          ],
+          data: t.callExpression(options.schema.instanceOf, [
+            t.identifier("Blob"),
+          ]),
+        };
+      }
+    }
+
+    if (!hasBody) {
+      return null;
+    }
+
+    return yield* new NotImplementedError({
+      message: `No supported requestBody type (${Object.keys(
+        method.requestBody.content
+      ).join(", ")}) in ${operationKey.upper}`,
+    });
+  });
+
+  const responseSchema = Effect.fn(function* (
+    content: { [format: string]: MediaTypeObject } | undefined
+  ) {
+    if (content) {
+      for (const [format, formatContent] of Object.entries(content)) {
+        if (format === "application/json") {
+          if (!formatContent.schema) {
+            continue;
+          }
+
+          const schema = formatContent.schema;
+
+          const decodedSchema = (yield* ensureSchema(schema)).expression;
+
+          return yield* generateJsonResponseCodec(
+            options,
+            yield* resolveSchema(schema),
+            decodedSchema
+          );
+        }
+      }
+    }
+
+    return yield* generateBlobResponseCodec(options);
+  });
+
   const ensureResponseSchema = Effect.fn(function* (
     operationKey: generationHelpers.OperationKey,
     method: OperationObject
   ) {
     const ctx = yield* DocumentContext;
 
-    if (!method.responses?.["200"]) return null;
+    let transform: t.Expression;
 
-    if ("$ref" in method.responses["200"])
-      return yield* new NotImplementedError({
-        message: "$ref in response",
-      });
+    if (!method.responses?.["200"]) {
+      transform = yield* responseSchema(undefined);
+    } else {
+      let response: ResponseObject;
 
-    if (!method.responses["200"].content) return null;
+      if ("$ref" in method.responses["200"]) {
+        const ref = method.responses["200"].$ref;
+        if (!ref.startsWith("#/components/responses/"))
+          return yield* new NotImplementedError({
+            message: `$ref ${ref} in response in ${operationKey.upper}`,
+          });
+        const responseName = ref.slice("#/components/responses/".length);
+        const newResponse = ctx.document.components?.responses?.[responseName];
+        if (!newResponse)
+          return yield* new NotImplementedError({
+            message: `Missing $ref ${ref} in response in ${operationKey.upper}`,
+          });
 
-    if (!method.responses["200"].content["application/json"]?.schema)
-      return yield* new NotImplementedError({
-        message: `response without 'application/json' content schema in ${operationKey.upper}`,
-      });
+        if ("$ref" in newResponse)
+          return yield* new NotImplementedError({
+            message: `$ref in $ref in response in ${operationKey.upper}`,
+          });
 
-    const schema = method.responses["200"].content["application/json"].schema;
+        response = newResponse;
+      } else {
+        response = method.responses["200"];
+      }
+
+      transform = yield* responseSchema(response.content);
+    }
 
     const identifier = t.identifier(`${operationKey.upper}_Response`);
-
-    const decodedSchema = (yield* ensureSchema(schema)).expression;
-
-    const transform = (options.builtins.parseJson ?? defaultParseJson(options))(
-      decodedSchema
-    );
 
     ctx.schemas.set(identifier.name, [
       t.exportNamedDeclaration(
@@ -852,22 +988,37 @@ export function createSchemaGenerator(
       yield* ensureSchema(schema);
     }
   });
+
   const processOperation = Effect.fn(function* (
     operationKey: generationHelpers.OperationKey,
-    _path: string,
+    path: string,
     _method: generationHelpers.HttpMethod,
     operation: OperationObject
   ) {
     if (options.includeOperations) {
-      yield* ensureParametersSchema(operationKey, operation);
+      yield* ensureParametersSchema(operationKey, operation, path);
       yield* ensureResponseSchema(operationKey, operation);
     }
+  });
+  const decodeResponse = Effect.fn(function* (
+    schema: t.Expression,
+    response: t.Expression
+  ) {
+    return options.methods.decode(schema, response);
+  });
+  const encodeParameters = Effect.fn(function* (
+    schema: t.Expression,
+    response: t.Expression
+  ) {
+    return options.methods.encode(schema, response);
   });
   return {
     processSchema,
     processOperation,
     ensureParametersSchema,
     ensureResponseSchema,
+    decodeResponse,
+    encodeParameters,
     get schemaType() {
       return options.types.schema;
     },
