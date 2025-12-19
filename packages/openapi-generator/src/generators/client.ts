@@ -155,7 +155,7 @@ export function createReactQueryClientGenerator(
               t.objectExpression([
                 t.objectProperty(
                   t.identifier("method"),
-                  t.stringLiteral(method)
+                  t.stringLiteral(method.toUpperCase())
                 ),
                 t.objectProperty(
                   t.identifier("headers"),
