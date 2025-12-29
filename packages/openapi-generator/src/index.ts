@@ -8,6 +8,7 @@ import {
 import { Effect, Stream } from "effect";
 import { FileSystem, type WatchEvent } from "@effect/platform/FileSystem";
 import { upgrade } from "@scalar/openapi-upgrader";
+import { FailedToUpgradeOpenApiDocumentError } from "./errors.js";
 
 export type OpenapiGenerateOptions = GeneratorOptions & {
   schema: string;
@@ -29,14 +30,10 @@ export const generate = Effect.fn(function* ({
       treeShake: false,
     })
   );
-  let upgraded;
-  try {
-    upgraded = upgrade(bundled, "3.2");
-  } catch (error) {
-    return yield* Effect.die(
-      new Error("Failed to upgrade OpenAPI document", { cause: error })
-    );
-  }
+  const upgraded = yield* Effect.try({
+    try: () => upgrade(bundled, "3.2"),
+    catch: (e) => new FailedToUpgradeOpenApiDocumentError({ cause: e }),
+  });
 
   const program = yield* generateEffect(upgraded, options);
 
