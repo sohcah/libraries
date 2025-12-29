@@ -11,12 +11,29 @@ export interface ZodSchemaGeneratorOptions extends SchemaGeneratorOptions {
   mini?: boolean;
 }
 
+const z = t.identifier("z");
+
+function getObjectShape(expression: t.Expression) {
+  // If the expression is z.object({...}), return the object argument, rather than unnecessarily using z.object(...).shape
+  if (
+    expression.type === "CallExpression" &&
+    expression.callee.type === "MemberExpression" &&
+    expression.callee.object.type === "Identifier" &&
+    expression.callee.object.name === "z" &&
+    expression.callee.property.type === "Identifier" &&
+    expression.callee.property.name === "object" &&
+    expression.arguments.length === 1 &&
+    expression.arguments[0]?.type === "ObjectExpression"
+  ) {
+    return expression.arguments[0];
+  }
+  return t.memberExpression(expression, t.identifier("shape"));
+}
+
 export const createZodSchemaGenerator = ({
   mini = false,
   ...options
 }: ZodSchemaGeneratorOptions) => {
-  const z = t.identifier("z");
-
   const maybeExtension = (
     expression: t.Expression,
     extension: string,
@@ -76,7 +93,7 @@ export const createZodSchemaGenerator = ({
           expressions.reduce((a, b) =>
             t.callExpression(
               t.memberExpression(mini ? z : a, t.identifier("extend")),
-              [...(mini ? [a] : []), b]
+              [...(mini ? [a] : []), getObjectShape(b)]
             )
           ),
         enum: (expressions) =>
