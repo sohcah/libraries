@@ -90,6 +90,7 @@ export type ExpressionWithType = {
     readonly?: boolean;
     optional?: boolean;
     isObject?: boolean;
+    isNull?: boolean;
   };
 };
 
@@ -573,6 +574,7 @@ export function createSchemaGenerator(
         };
       }
       case "null": {
+        typeMeta.isNull = true;
         return {
           expression: options.schema.null,
           ...equivalentType(t.tsNullKeyword()),
@@ -648,15 +650,25 @@ export function createSchemaGenerator(
         return [schema];
       });
 
-    const expressions: ExpressionWithType[] = [];
+    let expressions: ExpressionWithType[] = [];
     for (const schema of schemas) {
       expressions.push(
         yield* applyModifiers(yield* getBaseEffectSchema(schema), schema)
       );
     }
 
-    if (expressions.length !== 1) {
-      return {
+    let isNullable = false;
+    if (expressions.some((e) => e.typeMeta?.isNull)) {
+      isNullable = true;
+      expressions = expressions.filter((e) => !e.typeMeta?.isNull);
+    }
+
+    let result: ExpressionWithType;
+
+    if (expressions.length === 1) {
+      result = expressions[0]!;
+    } else {
+      result = {
         expression: options.schema.union(expressions.map((e) => e.expression)),
         typeDecoded: t.tsUnionType(expressions.map((e) => e.typeDecoded)),
         typeEncoded: t.tsUnionType(expressions.map((e) => e.typeEncoded)),
@@ -664,7 +676,19 @@ export function createSchemaGenerator(
       };
     }
 
-    return expressions[0]!;
+    if (isNullable) {
+      result.expression = options.modifiers.nullable(result.expression);
+      result.typeDecoded = t.tsUnionType([
+        result.typeDecoded,
+        t.tsNullKeyword(),
+      ]);
+      result.typeEncoded = t.tsUnionType([
+        result.typeEncoded,
+        t.tsNullKeyword(),
+      ]);
+    }
+
+    return result;
   });
 
   const ensureParametersSchema = Effect.fn(function* (
