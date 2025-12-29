@@ -27,7 +27,7 @@ function getObjectShape(expression: t.Expression) {
   ) {
     return expression.arguments[0];
   }
-  return t.memberExpression(z, t.identifier("shape"));
+  return t.memberExpression(expression, t.identifier("shape"));
 }
 
 export const createZodSchemaGenerator = ({
