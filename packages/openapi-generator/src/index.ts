@@ -1,6 +1,5 @@
-import fs from "node:fs/promises";
-import { bundle } from "@readme/openapi-parser";
-import type { OpenAPIV2, OpenAPIV3, OpenAPIV3_1 } from "openapi-types";
+import { bundle } from "@scalar/json-magic/bundle";
+import { readFiles, fetchUrls } from "@scalar/json-magic/bundle/plugins/node";
 import { generate as babelGenerate } from "@babel/generator";
 import {
   generate as generateEffect,
@@ -8,14 +7,10 @@ import {
 } from "./generator.js";
 import { Effect, Stream } from "effect";
 import { FileSystem, type WatchEvent } from "@effect/platform/FileSystem";
-
-type APIDocument<T extends object> =
-  | OpenAPIV2.Document<T>
-  | OpenAPIV3_1.Document<T>
-  | OpenAPIV3.Document<T>;
+import { upgrade } from "@scalar/openapi-upgrader";
 
 export type OpenapiGenerateOptions = GeneratorOptions & {
-  schema: APIDocument<object> | string;
+  schema: string;
 };
 
 export type OpenapiGenerateToFileOptions = OpenapiGenerateOptions & {
@@ -28,14 +23,22 @@ export const generate = Effect.fn(function* ({
   schema,
   ...options
 }: OpenapiGenerateOptions) {
-  const result = yield* Effect.tryPromise(() => bundle(schema));
-  if (!("components" in result)) {
+  const bundled = yield* Effect.tryPromise(() =>
+    bundle(schema, {
+      plugins: [readFiles(), fetchUrls({ limit: 5 })],
+      treeShake: false,
+    })
+  );
+  let upgraded;
+  try {
+    upgraded = upgrade(bundled, "3.2");
+  } catch (error) {
     return yield* Effect.die(
-      new Error("Not a valid OpenAPI 3.x document")
+      new Error("Failed to upgrade OpenAPI document", { cause: error })
     );
   }
 
-  const program = yield* generateEffect(result, options);
+  const program = yield* generateEffect(upgraded, options);
 
   return babelGenerate(program).code;
 });

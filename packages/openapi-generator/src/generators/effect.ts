@@ -65,6 +65,20 @@ export const createEffectSchemaGenerator = (
           t.memberExpression(t.identifier("Schema"), t.identifier("Union")),
           expressions
         ),
+      intersection: (expressions) =>
+        expressions.reduce((a, b) =>
+          t.callExpression(
+            t.memberExpression(t.identifier("Schema"), t.identifier("extend")),
+            [a, b]
+          )
+        ),
+      objectExtend: (expressions) =>
+        expressions.reduce((a, b) =>
+          t.callExpression(
+            t.memberExpression(t.identifier("Schema"), t.identifier("extend")),
+            [a, b]
+          )
+        ),
       enum: (expressions) =>
         t.callExpression(
           t.memberExpression(t.identifier("Schema"), t.identifier("Literal")),
@@ -123,42 +137,41 @@ export const createEffectSchemaGenerator = (
         decodeFn = t.arrowFunctionExpression(
           [t.identifier("from"), t.identifier("ctx")],
           t.callExpression(
-            t.memberExpression(
-              t.identifier("Effect"),
-              t.identifier("promise")
-            ),
+            t.memberExpression(t.identifier("Effect"), t.identifier("promise")),
             [t.arrowFunctionExpression([], decode, true)]
           )
         );
         encodeFn = t.arrowFunctionExpression(
           [t.identifier("from"), t.identifier("ctx")],
           t.callExpression(
-            t.memberExpression(
-              t.identifier("Effect"),
-              t.identifier("promise")
-            ),
+            t.memberExpression(t.identifier("Effect"), t.identifier("promise")),
             [t.arrowFunctionExpression([], encode, true)]
           )
         );
       } else {
-        decodeFn = t.arrowFunctionExpression([t.identifier("from"), t.identifier("ctx")], decode);
-        encodeFn = t.arrowFunctionExpression([t.identifier("from"), t.identifier("ctx")], encode);
+        decodeFn = t.arrowFunctionExpression(
+          [t.identifier("from"), t.identifier("ctx")],
+          decode
+        );
+        encodeFn = t.arrowFunctionExpression(
+          [t.identifier("from"), t.identifier("ctx")],
+          encode
+        );
       }
       return t.callExpression(
-        t.memberExpression(t.identifier("Schema"), t.identifier(decodeAsync || encodeAsync ? "transformOrFail" : "transform")),
+        t.memberExpression(
+          t.identifier("Schema"),
+          t.identifier(
+            decodeAsync || encodeAsync ? "transformOrFail" : "transform"
+          )
+        ),
         [
           encoded,
           decoded,
           t.objectExpression([
             t.objectProperty(t.identifier("strict"), t.booleanLiteral(true)),
-            t.objectProperty(
-              t.identifier("decode"),
-              decodeFn
-            ),
-            t.objectProperty(
-              t.identifier("encode"),
-              encodeFn
-            ),
+            t.objectProperty(t.identifier("decode"), decodeFn),
+            t.objectProperty(t.identifier("encode"), encodeFn),
           ]),
         ]
       );
