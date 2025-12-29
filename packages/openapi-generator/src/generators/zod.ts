@@ -65,6 +65,20 @@ export const createZodSchemaGenerator = ({
           t.callExpression(t.memberExpression(z, t.identifier("union")), [
             t.arrayExpression(expressions),
           ]),
+        intersection: (expressions) =>
+          expressions.reduce((a, b) =>
+            t.callExpression(
+              t.memberExpression(z, t.identifier("intersection")),
+              [a, b]
+            )
+          ),
+        objectExtend: (expressions) =>
+          expressions.reduce((a, b) =>
+            t.callExpression(
+              t.memberExpression(mini ? z : a, t.identifier("extend")),
+              [...(mini ? [a] : []), b]
+            )
+          ),
         enum: (expressions) =>
           t.callExpression(t.memberExpression(z, t.identifier("enum")), [
             t.arrayExpression(expressions),
@@ -94,7 +108,14 @@ export const createZodSchemaGenerator = ({
           []
         ),
       },
-      transformer: ({ encoded, decoded, decode, decodeAsync, encode, encodeAsync }) =>
+      transformer: ({
+        encoded,
+        decoded,
+        decode,
+        decodeAsync,
+        encode,
+        encodeAsync,
+      }) =>
         t.callExpression(t.memberExpression(z, t.identifier("codec")), [
           encoded,
           decoded,

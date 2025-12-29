@@ -1,6 +1,6 @@
 {
   "name": "@sohcah/openapi-generator",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "author": "Sam Hindess <mail@sohcah.dev>",
@@ -60,7 +60,7 @@
     "@effect/rpc": "^0.69.0",
     "@effect/sql": "^0.44.1",
     "@effect/typeclass": "^0.36.0",
-    "@readme/openapi-parser": "^5.0.1",
+    "@scalar/openapi-parser": "^0.23.9",
     "effect": "^3.17.7",
     "regex-escape": "^3.4.11",
     "zod": "^4.1.11"

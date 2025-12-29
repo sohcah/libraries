@@ -1,15 +1,13 @@
-import type { OpenAPIV3, OpenAPIV3_1 } from "openapi-types";
+import type { OpenAPIV3_2 as OA } from "@scalar/openapi-types";
 
-export type APIDocument<T extends object> =
-  | OpenAPIV3_1.Document<T>
-  | OpenAPIV3.Document<T>;
+export type APIDocument<T extends object> = OA.Document<T>;
 
-export type ReferenceObject = OpenAPIV3.ReferenceObject | OpenAPIV3_1.ReferenceObject;
+export type ReferenceObject = OA.ReferenceObject;
 
-export type SchemaObject = OpenAPIV3.SchemaObject | OpenAPIV3_1.SchemaObject;
+export type SchemaObject = OA.SchemaObject;
 
-export type OperationObject = OpenAPIV3_1.OperationObject | OpenAPIV3.OperationObject;
+export type OperationObject = OA.OperationObject;
 
-export type ResponseObject = OpenAPIV3.ResponseObject | OpenAPIV3_1.ResponseObject;
+export type ResponseObject = OA.ResponseObject;
 
-export type MediaTypeObject = OpenAPIV3.MediaTypeObject | OpenAPIV3_1.MediaTypeObject;
+export type MediaTypeObject = OA.MediaTypeObject;

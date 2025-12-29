@@ -142,7 +142,7 @@ export function createReactQueryClientGenerator(
           method !== "get" &&
           method !== "head" &&
           method !== "options" &&
-          !operation.tags?.some((i) => i.toLowerCase() === "query");
+          !(operation.tags as string[])?.some((i) => i.toLowerCase() === "query");
 
         const fetchCall = t.awaitExpression(
           t.callExpression(

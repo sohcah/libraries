@@ -71,13 +71,14 @@ const build = Effect.fn(function* (options: GeneratorOptions) {
 });
 
 export const generate = Effect.fn(function* (
-  document: APIDocument<object>,
+  document: APIDocument<{}>,
   options: GeneratorOptions
 ) {
   const context: DocumentContextData = {
     document,
     imports: [],
     schemas: new Map(),
+    schemaTypeMeta: new Map(),
     processingSchemas: new Set(),
     processingSchemaTypes: new Set(),
   };

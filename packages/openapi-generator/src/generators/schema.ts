@@ -52,6 +52,8 @@ export interface DefaultSchemaGeneratorOptions extends SchemaGeneratorOptions {
   schema: {
     record: (key: t.Expression, value: t.Expression) => t.Expression;
     union: (expressions: t.Expression[]) => t.Expression;
+    intersection: (expressions: t.Expression[]) => t.Expression;
+    objectExtend: (expressions: t.Expression[]) => t.Expression;
     enum: (expressions: t.Expression[]) => t.Expression;
     instanceOf: t.Expression;
     boolean: t.Expression;
@@ -80,13 +82,15 @@ export interface DefaultSchemaGeneratorOptions extends SchemaGeneratorOptions {
   supportsImmutability: boolean;
 }
 
-type ExpressionWithType = {
+export type ExpressionWithType = {
   expression: t.Expression;
   typeDecoded: t.TSType;
   typeEncoded: t.TSType;
   typeMeta: {
     readonly?: boolean;
     optional?: boolean;
+    isObject?: boolean;
+    isNull?: boolean;
   };
 };
 
@@ -309,6 +313,7 @@ export function createSchemaGenerator(
             )
           ),
         ]);
+        ctx.schemaTypeMeta.set(schemaName, schemaExpression.typeMeta);
         ctx.processingSchemas.delete(schemaName);
       }
 
@@ -326,7 +331,7 @@ export function createSchemaGenerator(
             t.tsTypeQuery(t.identifier(schemaKey.upper)),
           ])
         ),
-        typeMeta,
+        typeMeta: ctx.schemaTypeMeta.get(schemaName)!,
       };
     }
 
@@ -369,9 +374,49 @@ export function createSchemaGenerator(
       };
     }
 
+    if (schema.allOf) {
+      const results = yield* Effect.forEach(
+        (schema: SchemaObject | ReferenceObject) => ensureSchema(schema)
+      )(schema.allOf);
+
+      let result: ExpressionWithType;
+      if (results.length === 1) {
+        result = results[0]!;
+      } else {
+        result = {
+          expression: options.schema[
+            results.every((i) => i.typeMeta.isObject)
+              ? "objectExtend"
+              : "intersection"
+          ](results.map((result) => result.expression)),
+          typeDecoded: t.tsIntersectionType(
+            results.map((result) => result.typeDecoded)
+          ),
+          typeEncoded: t.tsIntersectionType(
+            results.map((result) => result.typeEncoded)
+          ),
+          typeMeta,
+        };
+      }
+
+      // Workaround to support Swashbuckle.AspNetCore's nullable attribute on allOf objects.
+      if ("nullable" in schema && schema.nullable) {
+        result.expression = options.modifiers.nullable(result.expression);
+        result.typeDecoded = t.tsUnionType([
+          result.typeDecoded,
+          t.tsNullKeyword(),
+        ]);
+        result.typeEncoded = t.tsUnionType([
+          result.typeEncoded,
+          t.tsNullKeyword(),
+        ]);
+      }
+      return result;
+    }
+
     if (schema.enum) {
       const unsupportedEnumValue = schema.enum.find(
-        (i) =>
+        (i: unknown) =>
           typeof i !== "string" &&
           typeof i !== "number" &&
           typeof i !== "boolean" &&
@@ -393,11 +438,13 @@ export function createSchemaGenerator(
       };
       return {
         expression: options.schema.enum(
-          schema.enum.map((e) => (e === null ? t.nullLiteral() : getLiteral(e)))
+          schema.enum.map((e: unknown) =>
+            e === null ? t.nullLiteral() : getLiteral(e)
+          )
         ),
         ...equivalentType(
           t.tsUnionType(
-            schema.enum.map((e) =>
+            schema.enum.map((e: unknown) =>
               e === null ? t.tsNullKeyword() : t.tsLiteralType(getLiteral(e))
             )
           )
@@ -453,12 +500,13 @@ export function createSchemaGenerator(
         };
       }
       case "object": {
+        typeMeta.isObject = true;
         const object = t.objectExpression([]);
         const objectTypeDecoded = t.tsTypeLiteral([]);
         const objectTypeEncoded = t.tsTypeLiteral([]);
         for (const [propertyKey, property] of Object.entries(
           schema.properties ?? {}
-        )) {
+        ) as [string, SchemaObject | ReferenceObject][]) {
           let propertySchema = yield* ensureSchema(property);
           const decodedMember = t.tsPropertySignature(
             t.identifier(propertyKey),
@@ -526,6 +574,7 @@ export function createSchemaGenerator(
         };
       }
       case "null": {
+        typeMeta.isNull = true;
         return {
           expression: options.schema.null,
           ...equivalentType(t.tsNullKeyword()),
@@ -555,19 +604,6 @@ export function createSchemaGenerator(
     if ("$ref" in schema) return expression;
 
     const modified = { ...expression };
-
-    // OpenAPI v3.0 support
-    if ("nullable" in schema && schema.nullable) {
-      modified.expression = options.modifiers.nullable(modified.expression);
-      modified.typeDecoded = t.tsUnionType([
-        modified.typeDecoded,
-        t.tsNullKeyword(),
-      ]);
-      modified.typeEncoded = t.tsUnionType([
-        modified.typeEncoded,
-        t.tsNullKeyword(),
-      ]);
-    }
 
     if (options.supportsImmutability) {
       if (schema.readOnly) {
@@ -600,6 +636,7 @@ export function createSchemaGenerator(
         return [schema];
       })
       .flatMap<SchemaObject | ReferenceObject>((schema) => {
+        if (typeof schema === "boolean") return [];
         if ("$ref" in schema) return [schema];
         if (Array.isArray(schema.type)) {
           return schema.type.map(
@@ -613,15 +650,25 @@ export function createSchemaGenerator(
         return [schema];
       });
 
-    const expressions: ExpressionWithType[] = [];
+    let expressions: ExpressionWithType[] = [];
     for (const schema of schemas) {
       expressions.push(
         yield* applyModifiers(yield* getBaseEffectSchema(schema), schema)
       );
     }
 
-    if (expressions.length !== 1) {
-      return {
+    let isNullable = false;
+    if (expressions.some((e) => e.typeMeta?.isNull)) {
+      isNullable = true;
+      expressions = expressions.filter((e) => !e.typeMeta?.isNull);
+    }
+
+    let result: ExpressionWithType;
+
+    if (expressions.length === 1) {
+      result = expressions[0]!;
+    } else {
+      result = {
         expression: options.schema.union(expressions.map((e) => e.expression)),
         typeDecoded: t.tsUnionType(expressions.map((e) => e.typeDecoded)),
         typeEncoded: t.tsUnionType(expressions.map((e) => e.typeEncoded)),
@@ -629,7 +676,19 @@ export function createSchemaGenerator(
       };
     }
 
-    return expressions[0]!;
+    if (isNullable) {
+      result.expression = options.modifiers.nullable(result.expression);
+      result.typeDecoded = t.tsUnionType([
+        result.typeDecoded,
+        t.tsNullKeyword(),
+      ]);
+      result.typeEncoded = t.tsUnionType([
+        result.typeEncoded,
+        t.tsNullKeyword(),
+      ]);
+    }
+
+    return result;
   });
 
   const ensureParametersSchema = Effect.fn(function* (
@@ -900,7 +959,7 @@ export function createSchemaGenerator(
   });
 
   const responseSchema = Effect.fn(function* (
-    content: { [format: string]: MediaTypeObject } | undefined
+    content: { [format: string]: MediaTypeObject | ReferenceObject } | undefined
   ) {
     if (content) {
       for (const [format, formatContent] of Object.entries(content)) {
