@@ -51,6 +51,7 @@ export interface DefaultSchemaGeneratorOptions extends SchemaGeneratorOptions {
   };
   schema: {
     record: (key: t.Expression, value: t.Expression) => t.Expression;
+    catchall: (object: t.Expression, value: t.Expression) => t.Expression;
     union: (expressions: t.Expression[]) => t.Expression;
     intersection: (expressions: t.Expression[]) => t.Expression;
     objectExtend: (expressions: t.Expression[]) => t.Expression;
@@ -543,6 +544,64 @@ export function createSchemaGenerator(
           objectTypeDecoded.members.push(decodedMember);
           objectTypeEncoded.members.push(encodedMember);
         }
+
+        if (schema.additionalProperties) {
+          const valueSchema = yield* ensureSchema(
+            schema.additionalProperties === true
+              ? { type: undefined }
+              : schema.additionalProperties
+          );
+
+          if (object.properties.length === 0) {
+            return {
+              expression: options.schema.record(
+                options.schema.string,
+                valueSchema.expression
+              ),
+              typeDecoded: t.tsTypeReference(
+                t.identifier("Record"),
+                t.tsTypeParameterInstantiation([
+                  t.tsStringKeyword(),
+                  valueSchema.typeDecoded,
+                ])
+              ),
+              typeEncoded: t.tsTypeReference(
+                t.identifier("Record"),
+                t.tsTypeParameterInstantiation([
+                  t.tsStringKeyword(),
+                  valueSchema.typeEncoded,
+                ])
+              ),
+              typeMeta,
+            };
+          }
+
+          const expression = options.schema.catchall(
+            t.callExpression(options.schema.object, [object]),
+            valueSchema.expression
+          );
+          const indexSignatureDecoded = t.tsIndexSignature(
+            [t.identifier("key")],
+            t.tsTypeAnnotation(valueSchema.typeDecoded)
+          );
+          const indexSignatureEncoded = t.tsIndexSignature(
+            [t.identifier("key")],
+            t.tsTypeAnnotation(valueSchema.typeEncoded)
+          );
+          return {
+            expression,
+            typeDecoded: t.tsTypeLiteral([
+              ...objectTypeDecoded.members,
+              indexSignatureDecoded,
+            ]),
+            typeEncoded: t.tsTypeLiteral([
+              ...objectTypeEncoded.members,
+              indexSignatureEncoded,
+            ]),
+            typeMeta,
+          };
+        }
+
         return {
           expression: t.callExpression(options.schema.object, [object]),
           typeDecoded: objectTypeDecoded,

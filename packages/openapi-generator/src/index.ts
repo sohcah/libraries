@@ -11,7 +11,7 @@ import { upgrade } from "@scalar/openapi-upgrader";
 import { FailedToUpgradeOpenApiDocumentError } from "./errors.js";
 
 export type OpenapiGenerateOptions = GeneratorOptions & {
-  schema: string;
+  schema: string | Record<string, unknown>;
 };
 
 export type OpenapiGenerateToFileOptions = OpenapiGenerateOptions & {

@@ -60,6 +60,25 @@ export const createEffectSchemaGenerator = (
             ]),
           ]
         ),
+      catchall: (object: t.Expression, value: t.Expression) =>
+        t.callExpression(
+          t.memberExpression(t.identifier("Schema"), t.identifier("extend")),
+          [
+            object,
+            t.callExpression(
+              t.memberExpression(t.identifier("Schema"), t.identifier("Record")),
+              [
+                t.objectExpression([
+                  t.objectProperty(
+                    t.identifier("key"),
+                    t.memberExpression(t.identifier("Schema"), t.identifier("String"))
+                  ),
+                  t.objectProperty(t.identifier("value"), value),
+                ]),
+              ]
+            ),
+          ]
+        ),
       union: (expressions) =>
         t.callExpression(
           t.memberExpression(t.identifier("Schema"), t.identifier("Union")),
