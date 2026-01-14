@@ -78,6 +78,11 @@ export const createZodSchemaGenerator = ({
             key,
             value,
           ]),
+        catchall: (object: t.Expression, value: t.Expression) =>
+          t.callExpression(
+            t.memberExpression(mini ? z : object, t.identifier("catchall")),
+            [...(mini ? [object] : []), value]
+          ),
         union: (expressions) =>
           t.callExpression(t.memberExpression(z, t.identifier("union")), [
             t.arrayExpression(expressions),

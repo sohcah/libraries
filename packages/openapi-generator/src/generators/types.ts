@@ -13,7 +13,7 @@ export interface ImportReference {
 
 export interface OpenApiGenerator {
   initialize?: () => Effect.Effect<void, NotImplementedError, DocumentContext>;
-  processSchema?: (
+  processSchema: (
     schema: SchemaObject
   ) => Effect.Effect<void, NotImplementedError, DocumentContext>;
   processOperation?: (

@@ -47,10 +47,11 @@ const build = Effect.fn(function* (options: GeneratorOptions) {
     }
   }
 
-  for (const schema of Object.values(ctx.document.components?.schemas ?? {})) {
+  for (const schema of Object.keys(ctx.document.components?.schemas ?? {})) {
     for (const generator of options.generators) {
-      if (!generator.processSchema) continue;
-      yield* generator.processSchema(schema);
+      yield* generator.processSchema({
+        $ref: `#/components/schemas/${schema}`,
+      });
     }
   }
 

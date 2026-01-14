@@ -106,6 +106,10 @@ export function createReactQueryClientGenerator(
         yield* options.schema.initialize();
       }
     }),
+    processSchema: Effect.fn(function* (schema) {
+      yield* ensureApi();
+      yield* options.schema.processSchema(schema);
+    }),
     processOperation: Effect.fn(
       function* (operationKey, path, method, operation) {
         const parametersSchema = yield* options.schema.ensureParametersSchema(
