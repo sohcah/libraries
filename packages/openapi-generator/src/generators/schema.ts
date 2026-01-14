@@ -580,12 +580,14 @@ export function createSchemaGenerator(
             t.callExpression(options.schema.object, [object]),
             valueSchema.expression
           );
+          const keyParam = t.identifier("key");
+          keyParam.typeAnnotation = t.tsTypeAnnotation(t.tsStringKeyword());
           const indexSignatureDecoded = t.tsIndexSignature(
-            [t.identifier("key")],
+            [keyParam],
             t.tsTypeAnnotation(valueSchema.typeDecoded)
           );
           const indexSignatureEncoded = t.tsIndexSignature(
-            [t.identifier("key")],
+            [keyParam],
             t.tsTypeAnnotation(valueSchema.typeEncoded)
           );
           return {
