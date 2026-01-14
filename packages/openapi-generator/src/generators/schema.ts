@@ -25,7 +25,7 @@ export interface SchemaGeneratorOptions {
   /** @default false */
   experimental_includeTypes?: boolean;
 
-  /** @default true */
+  /** @default false */
   includeSchemas?: boolean;
 
   /** @default false */
@@ -1102,7 +1102,7 @@ export function createSchemaGenerator(
   });
 
   const processSchema = Effect.fn(function* (schema: SchemaObject) {
-    if (options.includeSchemas ?? true) {
+    if (options.includeSchemas) {
       yield* ensureSchema(schema);
     }
   });
