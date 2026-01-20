@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
-import { defineConfig } from "../dist/config.js";
+import { defineConfig } from "../dist/config.mjs";
 import {
   createReactQueryClientGenerator,
   createZodSchemaGenerator,
   createEffectSchemaGenerator,
-} from "../dist/generators/index.js";
+} from "../dist/generators/index.mjs";
 
 const format = (process.env.SCHEMA_FORMAT ?? "zod") as
   | "zod"

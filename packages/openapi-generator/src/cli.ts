@@ -2,6 +2,7 @@
 
 import { Command, Options } from "@effect/cli";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
+import * as ParcelWatcher from "@effect/platform-node/NodeFileSystem/ParcelWatcher";
 import { Effect } from "effect";
 import { generateToFile } from "./index.js";
 
@@ -23,7 +24,7 @@ const command = Command.make("@sohcah/openapi-generator", {}).pipe(
           () => import(`file://${process.cwd()}/${args.config}`)
         ).pipe(
           Effect.mapError(
-            (e) => new Error(`Failed to load config: ${e.message}`)
+            (cause) => new Error("Failed to load config", { cause })
           )
         );
         yield* generateToFile({
@@ -42,4 +43,8 @@ const cli = Command.run(command, {
 });
 
 // Prepare and run the CLI application
-cli(process.argv).pipe(Effect.provide(NodeContext.layer), NodeRuntime.runMain);
+cli(process.argv).pipe(
+  Effect.provide(NodeContext.layer),
+  Effect.provide(ParcelWatcher.layer),
+  NodeRuntime.runMain
+);

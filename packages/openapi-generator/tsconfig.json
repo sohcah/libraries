@@ -3,7 +3,7 @@
     /* Base Options: */
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "target": "es2022",
+    "target": "es2024",
     "allowJs": true,
     "resolveJsonModule": true,
     "moduleDetection": "force",
@@ -27,8 +27,7 @@
     /* AND if you're building for a library in a monorepo: */
     "declarationMap": true,
 
-    "lib": ["es2022"],
+    "lib": ["es2024"],
     "types": ["node"]
-  },
-  "include": ["src", "tests", "sample"]
+  }
 }
