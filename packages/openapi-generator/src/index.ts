@@ -72,7 +72,7 @@ export const generateToFile = Effect.fn(function* ({
         if (watch) {
           yield* Console.error(`[${time()}] Failed to generate code`, error);
         } else {
-          yield* error;
+          yield* Effect.fail(error);
         }
       })
     );
@@ -82,7 +82,7 @@ export const generateToFile = Effect.fn(function* ({
   if (watch) {
     if (typeof options.schema !== "string") {
       return yield* Effect.die(
-        new Error("Schema must a file path to use watch mode")
+        new Error("Schema must be a file path to use watch mode")
       );
     }
     yield* Stream.runForEach(
