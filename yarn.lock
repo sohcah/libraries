@@ -3476,7 +3476,7 @@ __metadata:
     vitest: "npm:^4.0.17"
     zod: "npm:^4.3.5"
   bin:
-    openapi-generator: ./dist/cli.js
+    openapi-generator: ./dist/cli.mjs
   languageName: unknown
   linkType: soft
 
