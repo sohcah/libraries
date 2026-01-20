@@ -454,6 +454,21 @@ export function createSchemaGenerator(
       };
     }
 
+    if (schema.contentMediaType) {
+      if (schema.contentEncoding) {
+        return yield* new NotImplementedError({
+          message: `Unsupported 'contentEncoding' value: ${schema.contentEncoding}`,
+        });
+      }
+      return {
+        expression: t.callExpression(options.schema.instanceOf, [
+          t.identifier("Blob"),
+        ]),
+        ...equivalentType(t.tsTypeReference(t.identifier("Blob"))),
+        typeMeta,
+      };
+    }
+
     switch (schema.type) {
       case "boolean": {
         return {
@@ -463,16 +478,6 @@ export function createSchemaGenerator(
         };
       }
       case "string": {
-        if (schema.format === "binary") {
-          return {
-            expression: t.callExpression(options.schema.instanceOf, [
-              t.identifier("Blob"),
-            ]),
-            ...equivalentType(t.tsTypeReference(t.identifier("Blob"))),
-            typeMeta,
-          };
-        }
-
         let expression: ExpressionWithType = {
           expression: options.schema.string,
           ...equivalentType(t.tsStringKeyword()),
