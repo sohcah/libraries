@@ -35,6 +35,22 @@ export interface SchemaGeneratorOptions {
   deprecationHandling?: "unknown" | "optional";
 }
 
+const getBrandName = (
+  schema: SchemaObject
+): string | undefined => {
+  const ext = (schema as Record<string, unknown>)["x-sohcah-brand"];
+  if (
+    ext &&
+    typeof ext === "object" &&
+    ext !== null &&
+    "name" in ext &&
+    typeof (ext as { name: unknown }).name === "string"
+  ) {
+    return (ext as { name: string }).name;
+  }
+  return undefined;
+};
+
 export interface DefaultSchemaGeneratorOptions extends SchemaGeneratorOptions {
   modifiers: {
     lazy: (expression: t.Expression) => t.Expression;
@@ -43,7 +59,18 @@ export interface DefaultSchemaGeneratorOptions extends SchemaGeneratorOptions {
     immutable: (expression: t.Expression) => t.Expression;
     mutable: (expression: t.Expression) => t.Expression;
     nullable: (expression: t.Expression) => t.Expression;
+    /** Applied to primitive types when x-sohcah-brand extension is present. */
+    brand?: (expression: t.Expression, brandName: string) => t.Expression;
   };
+  /** Returns the branded TSType for typeDecoded when x-sohcah-brand is applied. */
+  brandedType?: (baseType: t.TSType, brandName: string) => t.TSType;
+  /** Returns the variable type annotation for exported branded schemas. */
+  brandedVariableType?: (
+    baseType: "string" | "number" | "integer" | "boolean",
+    brandName: string
+  ) => t.TSType;
+  /** Import to ensure when exporting branded schemas (e.g. { name: "$ZodBranded", from: "zod/v4/core" }). */
+  brandedVariableImport?: { name: string; from: string };
   types: {
     schema: t.TSQualifiedName;
     typeDecoded: t.TSQualifiedName;
@@ -92,6 +119,10 @@ export type ExpressionWithType = {
     optional?: boolean;
     isObject?: boolean;
     isNull?: boolean;
+    branded?: {
+      brandName: string;
+      baseType: "string" | "number" | "integer" | "boolean";
+    };
   };
 };
 
@@ -279,7 +310,22 @@ export function createSchemaGenerator(
         const schemaExpression = yield* ensureSchema(resolvedSchema);
 
         const schemaKeyIdentifier = t.identifier(schemaKey.upper);
-        if (options.experimental_includeTypes) {
+        const branded = schemaExpression.typeMeta?.branded;
+        if (
+          options.experimental_includeTypes &&
+          branded &&
+          options.brandedVariableType &&
+          options.brandedVariableImport
+        ) {
+          schemaKeyIdentifier.typeAnnotation = t.tsTypeAnnotation(
+            options.brandedVariableType(branded.baseType, branded.brandName)
+          );
+          yield* generationHelpers.ensureImport(
+            options.brandedVariableImport.name,
+            options.brandedVariableImport.from,
+            true
+          );
+        } else if (options.experimental_includeTypes) {
           schemaKeyIdentifier.typeAnnotation = t.tsTypeAnnotation(
             t.tsTypeReference(
               options.types.schema,
@@ -469,13 +515,39 @@ export function createSchemaGenerator(
       };
     }
 
+    const applyBrand = (
+      result: ExpressionWithType,
+      baseType: t.TSType,
+      schema: SchemaObject
+    ): ExpressionWithType => {
+      const brandName = getBrandName(schema);
+      if (!brandName || !options.modifiers.brand) return result;
+      const baseTypeKey = schema.type as
+        | "string"
+        | "number"
+        | "integer"
+        | "boolean";
+      return {
+        ...result,
+        expression: options.modifiers.brand(result.expression, brandName),
+        typeDecoded: options.brandedType
+          ? options.brandedType(baseType, brandName)
+          : result.typeDecoded,
+        typeMeta: {
+          ...result.typeMeta,
+          branded: { brandName, baseType: baseTypeKey },
+        },
+      };
+    };
+
     switch (schema.type) {
       case "boolean": {
-        return {
+        const result: ExpressionWithType = {
           expression: options.schema.boolean,
           ...equivalentType(t.tsBooleanKeyword()),
           typeMeta,
         };
+        return applyBrand(result, t.tsBooleanKeyword(), schema);
       }
       case "string": {
         let expression: ExpressionWithType = {
@@ -489,21 +561,23 @@ export function createSchemaGenerator(
             schema.pattern
           );
         }
-        return expression;
+        return applyBrand(expression, t.tsStringKeyword(), schema);
       }
       case "number": {
-        return {
+        const result: ExpressionWithType = {
           expression: options.schema.number,
           ...equivalentType(t.tsNumberKeyword()),
           typeMeta,
         };
+        return applyBrand(result, t.tsNumberKeyword(), schema);
       }
       case "integer": {
-        return {
+        const result: ExpressionWithType = {
           expression: options.schema.integer,
           ...equivalentType(t.tsNumberKeyword()),
           typeMeta,
         };
+        return applyBrand(result, t.tsNumberKeyword(), schema);
       }
       case "object": {
         typeMeta.isObject = true;

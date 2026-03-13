@@ -63,7 +63,46 @@ export const createZodSchemaGenerator = ({
         immutable: (expression) => expression,
         mutable: (expression) => expression,
         nullable: (expression) => maybeExtension(expression, "nullable", []),
+        brand: (expression, brandName) => {
+          const call = t.callExpression(
+            t.memberExpression(expression, t.identifier("brand")),
+            []
+          );
+          call.typeParameters = t.tsTypeParameterInstantiation([
+            t.tsLiteralType(t.stringLiteral(brandName)),
+            t.tsLiteralType(t.stringLiteral("inout")),
+          ]);
+          return call;
+        },
       },
+      brandedType: (baseType, brandName) => {
+        const prop = t.tsPropertySignature(
+          t.identifier("__brand"),
+          t.tsTypeAnnotation(t.tsLiteralType(t.stringLiteral(brandName)))
+        );
+        prop.readonly = true;
+        return t.tsIntersectionType([baseType, t.tsTypeLiteral([prop])]);
+      },
+      brandedVariableType: (baseType, brandName) => {
+        const baseTSType =
+          baseType === "string"
+            ? t.tsStringKeyword()
+            : baseType === "boolean"
+              ? t.tsBooleanKeyword()
+              : t.tsNumberKeyword();
+        return t.tsTypeReference(
+          t.identifier("$ZodBranded"),
+          t.tsTypeParameterInstantiation([
+            t.tsTypeReference(
+              t.tsQualifiedName(z, t.identifier("Schema")),
+              t.tsTypeParameterInstantiation([baseTSType, baseTSType])
+            ),
+            t.tsLiteralType(t.stringLiteral(brandName)),
+            t.tsLiteralType(t.stringLiteral("inout")),
+          ])
+        );
+      },
+      brandedVariableImport: { name: "$ZodBranded", from: "zod/v4/core" },
       types: {
         schema: t.tsQualifiedName(
           z,

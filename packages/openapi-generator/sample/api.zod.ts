@@ -4,6 +4,7 @@
 /*eslint-disable*/
 import { z } from "zod";
 import { type SkipToken, mutationOptions, queryOptions, type QueryKey, skipToken } from "@tanstack/react-query";
+import { type $ZodBranded } from "zod/v4/core";
 export class Api {
   #fetch;
   constructor(fetch: (path: string, options: {
@@ -440,17 +441,43 @@ export class Api {
     });
   }
 }
-export const Category = z.object({
+export const Category: z.Schema<{
+  id?: number;
+  name?: string;
+}, {
+  id?: number;
+  name?: string;
+}> = z.object({
   id: z.int().optional(),
   name: z.string().optional()
 });
 export type Category = z.output<typeof Category>;
-export const Tag = z.object({
+export const Tag: z.Schema<{
+  id?: number;
+  name?: string;
+}, {
+  id?: number;
+  name?: string;
+}> = z.object({
   id: z.int().optional(),
   name: z.string().optional()
 });
 export type Tag = z.output<typeof Tag>;
-export const Pet = z.object({
+export const Pet: z.Schema<{
+  id?: number;
+  name: string;
+  category?: z.output<typeof Category>;
+  photoUrls: string[];
+  tags?: z.output<typeof Tag>[];
+  status?: "available" | "pending" | "sold";
+}, {
+  id?: number;
+  name: string;
+  category?: z.input<typeof Category>;
+  photoUrls: string[];
+  tags?: z.input<typeof Tag>[];
+  status?: "available" | "pending" | "sold";
+}> = z.object({
   id: z.int().optional(),
   name: z.string(),
   category: Category.optional(),
@@ -685,7 +712,15 @@ export const UploadFile_Parameters = z.codec(ParametersSchema, z.object({
     body: from.data
   })
 });
-export const ApiResponse = z.object({
+export const ApiResponse: z.Schema<{
+  code?: number;
+  type?: string;
+  message?: string;
+}, {
+  code?: number;
+  type?: string;
+  message?: string;
+}> = z.object({
   code: z.int().optional(),
   type: z.string().optional(),
   message: z.string().optional()
@@ -733,7 +768,21 @@ export const GetInventory_Response = z.codec(z.instanceof(Response), z.record(z.
     throw new Error("Not implemented");
   }
 });
-export const Order = z.object({
+export const Order: z.Schema<{
+  id?: number;
+  petId?: number;
+  quantity?: number;
+  shipDate?: string;
+  status?: "placed" | "approved" | "delivered";
+  complete?: boolean;
+}, {
+  id?: number;
+  petId?: number;
+  quantity?: number;
+  shipDate?: string;
+  status?: "placed" | "approved" | "delivered";
+  complete?: boolean;
+}> = z.object({
   id: z.int().optional(),
   petId: z.int().optional(),
   quantity: z.int().optional(),
@@ -830,8 +879,31 @@ export const DeleteOrder_Response = z.codec(z.instanceof(Response), z.instanceof
     throw new Error("Not implemented");
   }
 });
-export const User = z.object({
+export const UserId: $ZodBranded<z.Schema<string, string>, "UserId", "inout"> = z.string().brand<"UserId", "inout">();
+export type UserId = z.output<typeof UserId>;
+export const User: z.Schema<{
+  id?: number;
+  userId?: z.output<typeof UserId>;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+  phone?: string;
+  userStatus?: number;
+}, {
+  id?: number;
+  userId?: z.input<typeof UserId>;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+  phone?: string;
+  userStatus?: number;
+}> = z.object({
   id: z.int().optional(),
+  userId: UserId.optional(),
   username: z.string().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),

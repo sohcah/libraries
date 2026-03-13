@@ -17,7 +17,7 @@ export default defineConfig({
   generators: [
     createReactQueryClientGenerator({
       schema: {
-        zod: createZodSchemaGenerator({}),
+        zod: createZodSchemaGenerator({ experimental_includeTypes: true }),
         "zod-mini": createZodSchemaGenerator({ mini: true }),
         effect: createEffectSchemaGenerator({}),
       }[format],

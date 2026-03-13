@@ -1094,6 +1094,9 @@
             "format": "int64",
             "example": 10
           },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
           "username": {
             "type": "string",
             "example": "theUser"
@@ -1196,6 +1199,12 @@
         },
         "xml": {
           "name": "pet"
+        }
+      },
+      "UserId": {
+        "type": "string",
+        "x-sohcah-brand": {
+          "name": "UserId"
         }
       },
       "ApiResponse": {

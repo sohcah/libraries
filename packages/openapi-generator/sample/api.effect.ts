@@ -801,8 +801,11 @@ export const DeleteOrder_Response = Schema.transformOrFail(Schema.instanceOf(Res
     throw new Error("Not implemented");
   })
 });
+export const UserId = Schema.String.pipe(Schema.mutable);
+export type UserId = Schema.Schema.Type<typeof UserId>;
 export const User = Schema.Struct({
   id: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable).pipe(Schema.optional),
+  userId: UserId.pipe(Schema.optional),
   username: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   firstName: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   lastName: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),

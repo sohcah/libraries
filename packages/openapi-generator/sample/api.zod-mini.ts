@@ -830,8 +830,11 @@ export const DeleteOrder_Response = z.codec(z.instanceof(Response), z.instanceof
     throw new Error("Not implemented");
   }
 });
+export const UserId = z.string().brand<"UserId", "inout">();
+export type UserId = z.output<typeof UserId>;
 export const User = z.object({
   id: z.optional(z.int()),
+  userId: z.optional(UserId),
   username: z.optional(z.string()),
   firstName: z.optional(z.string()),
   lastName: z.optional(z.string()),

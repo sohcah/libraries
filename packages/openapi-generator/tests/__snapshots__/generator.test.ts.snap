@@ -804,8 +804,11 @@ export const DeleteOrder_Response = Schema.transformOrFail(Schema.instanceOf(Res
     throw new Error("Not implemented");
   })
 });
+export const UserId = Schema.String.pipe(Schema.mutable);
+export type UserId = Schema.Schema.Type<typeof UserId>;
 export const User = Schema.Struct({
   id: Schema.Number.pipe(Schema.int()).pipe(Schema.mutable).pipe(Schema.optional),
+  userId: UserId.pipe(Schema.optional),
   username: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   firstName: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
   lastName: Schema.String.pipe(Schema.mutable).pipe(Schema.optional),
@@ -1842,8 +1845,11 @@ export const DeleteOrder_Response = z.codec(z.instanceof(Response), z.instanceof
     throw new Error("Not implemented");
   }
 });
+export const UserId = z.string().brand<"UserId", "inout">();
+export type UserId = z.output<typeof UserId>;
 export const User = z.object({
   id: z.int().optional(),
+  userId: UserId.optional(),
   username: z.string().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
