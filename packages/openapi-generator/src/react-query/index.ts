@@ -235,7 +235,20 @@ export class ReactQueryGenerator implements OpenApiGenerator {
                 }),
                 Object.assign(t.identifier("options"), {
                   typeAnnotation: t.tsTypeAnnotation(
-                    t.tsTypeReference(t.identifier("RequestInit")),
+                    t.tsTypeLiteral([
+                      t.tsPropertySignature(
+                        t.identifier("method"),
+                        t.tsTypeAnnotation(t.tsStringKeyword()),
+                      ),
+                      Object.assign(t.tsPropertySignature(
+                        t.identifier("headers"),
+                        t.tsTypeAnnotation(t.tsTypeReference(t.identifier("Headers"))),
+                      ),{ optional: true }),
+                      Object.assign(t.tsPropertySignature(
+                        t.identifier("body"),
+                        t.tsTypeAnnotation(t.tsTypeReference(t.identifier("BodyInit"))),
+                      ),{ optional: true }),
+                    ])
                   ),
                 }),
               ],
