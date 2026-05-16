@@ -4,7 +4,6 @@ import { readFiles, fetchUrls } from "@scalar/json-magic/bundle/plugins/node";
 import { upgrade } from "@scalar/openapi-upgrader";
 import { type ApiDocument, type OpenApiGenerator } from "./core.js";
 import { createMagicProxy } from "@scalar/json-magic/magic-proxy";
-import { writeFileSync } from "fs";
 
 export async function generate<Builders extends Record<string, OpenApiGenerator>>(
   config: OpenApiConfig<Builders>,
@@ -62,6 +61,4 @@ export async function generate<Builders extends Record<string, OpenApiGenerator>
   for (const builder of buildersList) {
     await builder.complete();
   }
-
-  writeFileSync("swagger.json", JSON.stringify(bundled, null, 2));
 }
