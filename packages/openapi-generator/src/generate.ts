@@ -2,16 +2,13 @@ import type { OpenApiConfig } from "./config.js";
 import { bundle } from "@scalar/json-magic/bundle";
 import { readFiles, fetchUrls } from "@scalar/json-magic/bundle/plugins/node";
 import { upgrade } from "@scalar/openapi-upgrader";
-import {
-  type ApiDocument,
-  type OpenApiGenerator,
-} from "./core.js";
+import { type ApiDocument, type OpenApiGenerator } from "./core.js";
 import { createMagicProxy } from "@scalar/json-magic/magic-proxy";
 import { writeFileSync } from "fs";
 
-export async function generate<
-  Builders extends Record<string, OpenApiGenerator>,
->(config: OpenApiConfig<Builders>) {
+export async function generate<Builders extends Record<string, OpenApiGenerator>>(
+  config: OpenApiConfig<Builders>,
+) {
   const bundled = await bundle(config.schema, {
     plugins: [readFiles(), fetchUrls({ limit: 5 })],
     treeShake: false,

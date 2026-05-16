@@ -21,8 +21,7 @@ export interface OpenApiConfigBuilder<
 
 class OpenApiConfigBuilderImpl<
   Builders extends Record<string, OpenApiGenerator>,
-> implements OpenApiConfigBuilder<Builders>
-{
+> implements OpenApiConfigBuilder<Builders> {
   #config: OpenApiConfigBase;
   #builders: Builders;
 
@@ -43,18 +42,13 @@ class OpenApiConfigBuilderImpl<
     name: Name,
     builder: (config: OpenApiConfig<Builders>) => Builder,
   ): OpenApiConfigBuilder<Builders & { [K in Name]: Builder }> {
-    return new OpenApiConfigBuilderImpl<Builders & { [K in Name]: Builder }>(
-      this.#config,
-      {
-        ...this.#builders,
-        [name]: builder(this),
-      },
-    );
+    return new OpenApiConfigBuilderImpl<Builders & { [K in Name]: Builder }>(this.#config, {
+      ...this.#builders,
+      [name]: builder(this),
+    });
   }
 }
 
-export function defineConfig(
-  config: OpenApiConfigBase,
-): OpenApiConfigBuilder<{}> {
+export function defineConfig(config: OpenApiConfigBase): OpenApiConfigBuilder<{}> {
   return new OpenApiConfigBuilderImpl<{}>(config, {});
 }

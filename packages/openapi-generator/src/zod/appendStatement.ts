@@ -31,9 +31,7 @@ function createAppendStatementInternal(
     );
     if (!appendStatement) return null;
     return t.forOfStatement(
-      t.variableDeclaration("const", [
-        t.variableDeclarator(t.identifier("item")),
-      ]),
+      t.variableDeclaration("const", [t.variableDeclarator(t.identifier("item"))]),
       value,
       appendStatement,
     );
@@ -42,11 +40,7 @@ function createAppendStatementInternal(
   if (schema.type === "string") {
     return append(value);
   }
-  if (
-    schema.type === "number" ||
-    schema.type === "integer" ||
-    schema.type === "boolean"
-  ) {
+  if (schema.type === "number" || schema.type === "integer" || schema.type === "boolean") {
     return append(t.callExpression(t.identifier("String"), [value]));
   }
   return null;
@@ -59,12 +53,7 @@ export function createAppendStatement(
   schemaRef: SchemaReferenceType,
   required: boolean,
 ): t.Statement | null {
-  const appendStatement = createAppendStatementInternal(
-    appendTo,
-    name,
-    value,
-    schemaRef,
-  );
+  const appendStatement = createAppendStatementInternal(appendTo, name, value, schemaRef);
   if (!appendStatement) return null;
   if (required) return appendStatement;
   return t.ifStatement(

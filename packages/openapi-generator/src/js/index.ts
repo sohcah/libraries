@@ -11,19 +11,13 @@ export interface JsDocument {
 export const JsSchemaGeneratorExtension = Symbol("JsSchemaGeneratorExtension");
 export type OpenApiJsSchemaGenerator = OpenApiGenerator & {
   [JsSchemaGeneratorExtension]: {
-    getParameterType: (
-      doc: JsDocument,
-      ref: OperationReference,
-    ) => Promise<t.TSType>;
+    getParameterType: (doc: JsDocument, ref: OperationReference) => Promise<t.TSType>;
     encodeParameters: (
       doc: JsDocument,
       ref: OperationReference,
       parameters: t.Expression,
     ) => Promise<t.Expression>;
-    getResponseType: (
-      doc: JsDocument,
-      ref: OperationReference,
-    ) => Promise<t.TSType>;
+    getResponseType: (doc: JsDocument, ref: OperationReference) => Promise<t.TSType>;
     parseResponse: (
       doc: JsDocument,
       ref: OperationReference,

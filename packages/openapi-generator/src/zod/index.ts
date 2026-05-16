@@ -1,8 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import {
-  JsSchemaGeneratorExtension,
-  type OpenApiJsSchemaGenerator,
-} from "../js/index.js";
+import { JsSchemaGeneratorExtension, type OpenApiJsSchemaGenerator } from "../js/index.js";
 import {
   type OpenApiGenerator,
   type ApiDocument,
@@ -24,10 +21,7 @@ import {
 } from "../js/stringLiteralOrIdentifier.js";
 import { ensureImport, relativeImportPath } from "../js/ensureImport.js";
 
-function comment<T extends t.Node>(
-  comment: string | null | undefined,
-  node: T,
-) {
+function comment<T extends t.Node>(comment: string | null | undefined, node: T) {
   if (!comment) return node;
   return t.addComment(node, "leading", comment);
 }
@@ -64,18 +58,14 @@ interface ZodSchemaContext {
 }
 
 function omit<T extends object>(obj: T, keys: string[]): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([key]) => !keys.includes(key)),
-  ) as T;
+  return Object.fromEntries(Object.entries(obj).filter(([key]) => !keys.includes(key))) as T;
 }
 
 interface ZodBodyOption {
   hasContentType: boolean;
 }
 
-export class ZodGenerator
-  implements OpenApiGenerator, OpenApiJsSchemaGenerator
-{
+export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator {
   #options: ZodGeneratorOptions;
   #imports: t.ImportDeclaration[];
   #header: t.Statement[];
@@ -84,10 +74,7 @@ export class ZodGenerator
   constructor(options: ZodGeneratorOptions) {
     this.#options = options;
     this.#imports = [
-      t.importDeclaration(
-        [t.importDefaultSpecifier(t.identifier("z"))],
-        t.stringLiteral("zod"),
-      ),
+      t.importDeclaration([t.importDefaultSpecifier(t.identifier("z"))], t.stringLiteral("zod")),
     ];
     this.#header = [];
     this.#schemas = new Map();
@@ -102,45 +89,33 @@ export class ZodGenerator
         t.variableDeclaration("const", [
           t.variableDeclarator(
             t.identifier("ParametersSchema"),
-            t.callExpression(
-              t.memberExpression(t.identifier("z"), t.identifier("object")),
-              [
-                t.objectExpression([
-                  t.objectProperty(t.identifier("path"), this.#z("string", [])),
-                  t.objectProperty(
-                    t.identifier("method"),
-                    this.#z("string", []),
-                  ),
-                  t.objectProperty(
-                    t.identifier("headers"),
-                    this.#z(
-                      "optional",
-                      [this.#z("instanceof", [t.identifier("Headers")])],
-                      true,
-                    ),
-                  ),
-                  t.objectProperty(
-                    t.identifier("body"),
-                    this.#z(
-                      "optional",
-                      [
-                        this.#z("union", [
-                          t.arrayExpression([
-                            this.#z("string", []),
-                            this.#z("instanceof", [t.identifier("Blob")]),
-                            this.#z("instanceof", [t.identifier("FormData")]),
-                            this.#z("instanceof", [
-                              t.identifier("URLSearchParams"),
-                            ]),
-                          ]),
+            t.callExpression(t.memberExpression(t.identifier("z"), t.identifier("object")), [
+              t.objectExpression([
+                t.objectProperty(t.identifier("path"), this.#z("string", [])),
+                t.objectProperty(t.identifier("method"), this.#z("string", [])),
+                t.objectProperty(
+                  t.identifier("headers"),
+                  this.#z("optional", [this.#z("instanceof", [t.identifier("Headers")])], true),
+                ),
+                t.objectProperty(
+                  t.identifier("body"),
+                  this.#z(
+                    "optional",
+                    [
+                      this.#z("union", [
+                        t.arrayExpression([
+                          this.#z("string", []),
+                          this.#z("instanceof", [t.identifier("Blob")]),
+                          this.#z("instanceof", [t.identifier("FormData")]),
+                          this.#z("instanceof", [t.identifier("URLSearchParams")]),
                         ]),
-                      ],
-                      true,
-                    ),
+                      ]),
+                    ],
+                    true,
                   ),
-                ]),
-              ],
-            ),
+                ),
+              ]),
+            ]),
           ),
         ]),
       );
@@ -160,9 +135,7 @@ export class ZodGenerator
               [],
               t.blockStatement([
                 t.throwStatement(
-                  t.newExpression(t.identifier("Error"), [
-                    t.stringLiteral("Not implemented"),
-                  ]),
+                  t.newExpression(t.identifier("Error"), [t.stringLiteral("Not implemented")]),
                 ),
               ]),
             ),
@@ -190,10 +163,7 @@ export class ZodGenerator
                   t.returnStatement(
                     t.awaitExpression(
                       t.callExpression(
-                        t.memberExpression(
-                          t.identifier("value"),
-                          t.identifier("blob"),
-                        ),
+                        t.memberExpression(t.identifier("value"), t.identifier("blob")),
                         [],
                       ),
                     ),
@@ -222,10 +192,7 @@ export class ZodGenerator
               t.returnStatement(
                 t.awaitExpression(
                   t.callExpression(
-                    t.memberExpression(
-                      t.identifier("response"),
-                      t.identifier("json"),
-                    ),
+                    t.memberExpression(t.identifier("response"), t.identifier("json")),
                     [],
                   ),
                 ),
@@ -233,30 +200,19 @@ export class ZodGenerator
             ]),
             t.catchClause(
               Object.assign(t.identifier("error"), {
-                typeAnnotation: t.tsTypeAnnotation(
-                  t.tsUnknownKeyword(),
-                ),
+                typeAnnotation: t.tsTypeAnnotation(t.tsUnknownKeyword()),
               }),
               t.blockStatement([
                 t.expressionStatement(
                   t.callExpression(
                     t.memberExpression(
-                      t.memberExpression(
-                        t.identifier("ctx"),
-                        t.identifier("issues"),
-                      ),
+                      t.memberExpression(t.identifier("ctx"), t.identifier("issues")),
                       t.identifier("push"),
                     ),
                     [
                       t.objectExpression([
-                        t.objectProperty(
-                          t.identifier("code"),
-                          t.stringLiteral("custom"),
-                        ),
-                        t.objectProperty(
-                          t.identifier("input"),
-                          t.identifier("error"),
-                        ),
+                        t.objectProperty(t.identifier("code"), t.stringLiteral("custom")),
+                        t.objectProperty(t.identifier("input"), t.identifier("error")),
                         t.objectProperty(
                           t.identifier("message"),
                           t.memberExpression(
@@ -271,12 +227,7 @@ export class ZodGenerator
                     ],
                   ),
                 ),
-                t.returnStatement(
-                  t.memberExpression(
-                    t.identifier("z"),
-                    t.identifier("NEVER"),
-                  ),
-                ),
+                t.returnStatement(t.memberExpression(t.identifier("z"), t.identifier("NEVER"))),
               ]),
             ),
           ),
@@ -286,10 +237,8 @@ export class ZodGenerator
       decode.returnType = t.tsTypeAnnotation(
         t.tsTypeReference(
           t.identifier("Promise"),
-          t.tsTypeParameterInstantiation([
-            t.tsUnknownKeyword(),
-          ]),
-        )
+          t.tsTypeParameterInstantiation([t.tsUnknownKeyword()]),
+        ),
       );
       this.#header.push(
         t.variableDeclaration("const", [
@@ -331,9 +280,7 @@ export class ZodGenerator
                     ),
                     t.objectProperty(
                       t.identifier("content"),
-                      t.callExpression(t.identifier("JSON.stringify"), [
-                        t.identifier("value"),
-                      ]),
+                      t.callExpression(t.identifier("JSON.stringify"), [t.identifier("value")]),
                     ),
                   ]),
                 ),
@@ -352,17 +299,14 @@ export class ZodGenerator
     decode: t.Expression,
     encode: t.Expression,
   ): t.Expression {
-    return t.callExpression(
-      t.memberExpression(t.identifier("z"), t.identifier("codec")),
-      [
-        inExpression,
-        outExpression,
-        t.objectExpression([
-          t.objectProperty(t.identifier("decode"), decode),
-          t.objectProperty(t.identifier("encode"), encode),
-        ]),
-      ],
-    );
+    return t.callExpression(t.memberExpression(t.identifier("z"), t.identifier("codec")), [
+      inExpression,
+      outExpression,
+      t.objectExpression([
+        t.objectProperty(t.identifier("decode"), decode),
+        t.objectProperty(t.identifier("encode"), encode),
+      ]),
+    ]);
   }
 
   #zSchemaType(inType: t.TSType, outType: t.TSType = inType): t.TSType {
@@ -417,21 +361,13 @@ export class ZodGenerator
     typeParameters?: t.TSTypeParameterInstantiation,
   ): t.Expression {
     const call = chain
-      ? t.callExpression(
-          t.memberExpression(args[0]!, t.identifier(name)),
-          args.slice(1),
-        )
-      : t.callExpression(
-          t.memberExpression(t.identifier("z"), t.identifier(name)),
-          args,
-        );
+      ? t.callExpression(t.memberExpression(args[0]!, t.identifier(name)), args.slice(1))
+      : t.callExpression(t.memberExpression(t.identifier("z"), t.identifier(name)), args);
     call.typeParameters = typeParameters;
     return call;
   }
 
-  #literal(
-    value: unknown,
-  ): t.StringLiteral | t.NumericLiteral | t.BooleanLiteral {
+  #literal(value: unknown): t.StringLiteral | t.NumericLiteral | t.BooleanLiteral {
     if (typeof value === "string") {
       return t.stringLiteral(value);
     }
@@ -454,26 +390,20 @@ export class ZodGenerator
     const objectTypeOutput = t.tsTypeLiteral([]);
 
     // Properties
-    for (const [propertyKey, property] of Object.entries(
-      schema.properties ?? {},
-    )) {
+    for (const [propertyKey, property] of Object.entries(schema.properties ?? {})) {
       const optional = !(schema.required?.includes(propertyKey) ?? false);
       const propertySchema = this.#getZodSchema(document, property, {});
       object.properties.push(
         t.objectProperty(
           stringLiteralOrIdentifier(propertyKey),
-          optional
-            ? this.#z("optional", [propertySchema.schema], true)
-            : propertySchema.schema,
+          optional ? this.#z("optional", [propertySchema.schema], true) : propertySchema.schema,
         ),
       );
       objectTypeInput.members.push(
         Object.assign(
           t.tsPropertySignature(
             stringLiteralOrIdentifier(propertyKey),
-            t.tsTypeAnnotation(
-              this.#zResolvedType("input", propertySchema.type),
-            ),
+            t.tsTypeAnnotation(this.#zResolvedType("input", propertySchema.type)),
           ),
           { optional },
         ),
@@ -482,9 +412,7 @@ export class ZodGenerator
         Object.assign(
           t.tsPropertySignature(
             stringLiteralOrIdentifier(propertyKey),
-            t.tsTypeAnnotation(
-              this.#zResolvedType("output", propertySchema.type),
-            ),
+            t.tsTypeAnnotation(this.#zResolvedType("output", propertySchema.type)),
           ),
           { optional },
         ),
@@ -495,19 +423,14 @@ export class ZodGenerator
     if (schema.additionalProperties) {
       const valueSchema = this.#getZodSchema(
         document,
-        schema.additionalProperties === true
-          ? ({} as SchemaObject)
-          : schema.additionalProperties,
+        schema.additionalProperties === true ? ({} as SchemaObject) : schema.additionalProperties,
         {},
       );
 
       // When *only* additional properties, use z.record
       if (object.properties.length === 0) {
         return {
-          schema: this.#z("record", [
-            this.#z("string", []),
-            valueSchema.schema,
-          ]),
+          schema: this.#z("record", [this.#z("string", []), valueSchema.schema]),
           type: this.#zSchemaType(
             t.tsTypeReference(
               t.identifier("Record"),
@@ -531,27 +454,20 @@ export class ZodGenerator
       const keyParam = t.identifier("key");
       keyParam.typeAnnotation = t.tsTypeAnnotation(t.tsStringKeyword());
       return {
-        schema: this.#z("catchall", [
-          this.#z("object", [object]),
-          valueSchema.schema,
-        ]),
+        schema: this.#z("catchall", [this.#z("object", [object]), valueSchema.schema]),
         type: this.#zSchemaType(
           t.tsTypeLiteral([
             ...objectTypeInput.members,
             t.tsIndexSignature(
               [keyParam],
-              t.tsTypeAnnotation(
-                this.#zResolvedType("input", valueSchema.type),
-              ),
+              t.tsTypeAnnotation(this.#zResolvedType("input", valueSchema.type)),
             ),
           ]),
           t.tsTypeLiteral([
             ...objectTypeOutput.members,
             t.tsIndexSignature(
               [keyParam],
-              t.tsTypeAnnotation(
-                this.#zResolvedType("output", valueSchema.type),
-              ),
+              t.tsTypeAnnotation(this.#zResolvedType("output", valueSchema.type)),
             ),
           ]),
         ),
@@ -573,11 +489,7 @@ export class ZodGenerator
     schema: Extract<SchemaObject, { type: "array" }>,
     ctx: ZodSchemaContext,
   ): ZodSchema {
-    const itemSchema = this.#getZodSchema(
-      document,
-      schema.items ?? ({} as SchemaObject),
-      {},
-    );
+    const itemSchema = this.#getZodSchema(document, schema.items ?? ({} as SchemaObject), {});
     return {
       schema: this.#z("array", [itemSchema.schema]),
       type: this.#zSchemaType(
@@ -596,14 +508,8 @@ export class ZodGenerator
       const schemaKey = schema.$ref.split("/").pop()!;
       const trySuffixes = ["", ...(ctx.base ? ["_Base"] : [])];
 
-      if (
-        !trySuffixes.some((suffix) => this.#schemas.has(schema.$ref + suffix))
-      ) {
-        const zodSchema = this.#getZodSchema(
-          document,
-          dereferenceSchema(document, schema),
-          ctx,
-        );
+      if (!trySuffixes.some((suffix) => this.#schemas.has(schema.$ref + suffix))) {
+        const zodSchema = this.#getZodSchema(document, dereferenceSchema(document, schema), ctx);
         const suffix = zodSchema.meta?.discriminatedBase ? "_Base" : "";
         const identifier = t.identifier(schemaKey + suffix);
         if (this.#options.includeTypeAnnotations) {
@@ -612,9 +518,7 @@ export class ZodGenerator
         this.#schemas.set(schema.$ref + suffix, {
           statements: [
             t.exportNamedDeclaration(
-              t.variableDeclaration("const", [
-                t.variableDeclarator(identifier, zodSchema.schema),
-              ]),
+              t.variableDeclaration("const", [t.variableDeclarator(identifier, zodSchema.schema)]),
             ),
             t.exportNamedDeclaration(
               t.tsTypeAliasDeclaration(
@@ -649,25 +553,13 @@ export class ZodGenerator
       const outputSchema = isObject
         ? schemas
             .map((s) => s.schema)
-            .reduce((a, b) =>
-              this.#z(
-                "extend",
-                [a, this.#zObjectShape(b)],
-                true
-              ),
-            )
-        : schemas
-            .map((s) => s.schema)
-            .reduce((a, b) => this.#z("intersection", [a, b]));
+            .reduce((a, b) => this.#z("extend", [a, this.#zObjectShape(b)], true))
+        : schemas.map((s) => s.schema).reduce((a, b) => this.#z("intersection", [a, b]));
       return {
         schema: outputSchema,
         type: this.#zSchemaType(
-          t.tsIntersectionType(
-            schemas.map((s) => this.#zResolvedType("input", s.type)),
-          ),
-          t.tsIntersectionType(
-            schemas.map((s) => this.#zResolvedType("output", s.type)),
-          ),
+          t.tsIntersectionType(schemas.map((s) => this.#zResolvedType("input", s.type))),
+          t.tsIntersectionType(schemas.map((s) => this.#zResolvedType("output", s.type))),
         ),
         meta: {
           isObject,
@@ -695,16 +587,12 @@ export class ZodGenerator
       const schemas = Object.entries(schema.discriminator.mapping).map(
         ([discriminatorKey, discriminatedSchemaRef]): ZodSchema => {
           if (!discriminatedSchemaRef.startsWith("#/components/schemas/")) {
-            throw new Error(
-              `Invalid discriminator schema reference: ${discriminatedSchemaRef}`,
-            );
+            throw new Error(`Invalid discriminator schema reference: ${discriminatedSchemaRef}`);
           }
           const discriminatedSchema =
             document.components?.schemas?.[discriminatedSchemaRef.slice(21)];
           if (!discriminatedSchema) {
-            throw new Error(
-              `Discriminator schema not found: ${discriminatedSchemaRef}`,
-            );
+            throw new Error(`Discriminator schema not found: ${discriminatedSchemaRef}`);
           }
           return this.#getZodSchema(
             document,
@@ -712,10 +600,7 @@ export class ZodGenerator
               allOf: [
                 {
                   $ref: discriminatedSchemaRef,
-                  "$ref-value": dereferenceSchema(
-                    document,
-                    discriminatedSchema,
-                  ),
+                  "$ref-value": dereferenceSchema(document, discriminatedSchema),
                 },
                 {
                   type: "object",
@@ -733,26 +618,14 @@ export class ZodGenerator
         },
       );
       const useDiscrimination = schemas.every((s) => s.meta?.isObject);
-      const unionSchema = this.#z(
-        useDiscrimination ? "discriminatedUnion" : "union",
-        [
-          ...(useDiscrimination
-            ? [t.stringLiteral(schema.discriminator.propertyName)]
-            : []),
-          t.arrayExpression(schemas.map((s) => s.schema)),
-        ],
-      );
-      const unionTypeIn = t.tsUnionType(
-        schemas.map((s) => this.#zResolvedType("input", s.type)),
-      );
-      const unionTypeOut = t.tsUnionType(
-        schemas.map((s) => this.#zResolvedType("output", s.type)),
-      );
+      const unionSchema = this.#z(useDiscrimination ? "discriminatedUnion" : "union", [
+        ...(useDiscrimination ? [t.stringLiteral(schema.discriminator.propertyName)] : []),
+        t.arrayExpression(schemas.map((s) => s.schema)),
+      ]);
+      const unionTypeIn = t.tsUnionType(schemas.map((s) => this.#zResolvedType("input", s.type)));
+      const unionTypeOut = t.tsUnionType(schemas.map((s) => this.#zResolvedType("output", s.type)));
 
-      if (
-        "x-sohcah-extensible-union" in schema &&
-        schema["x-sohcah-extensible-union"]
-      ) {
+      if ("x-sohcah-extensible-union" in schema && schema["x-sohcah-extensible-union"]) {
         return {
           schema: this.#z("union", [
             t.arrayExpression([
@@ -760,9 +633,7 @@ export class ZodGenerator
               this.#z("object", [
                 t.objectExpression([
                   t.objectProperty(
-                    stringLiteralOrIdentifier(
-                      schema.discriminator.propertyName,
-                    ),
+                    stringLiteralOrIdentifier(schema.discriminator.propertyName),
                     this.#z(
                       "transform",
                       [
@@ -781,9 +652,7 @@ export class ZodGenerator
                                       t.stringLiteral(i),
                                     ),
                                 )
-                                .reduce((a, b) =>
-                                  t.logicalExpression("&&", a, b),
-                                ),
+                                .reduce((a, b) => t.logicalExpression("&&", a, b)),
                             ),
                           ],
                           true,
@@ -804,14 +673,8 @@ export class ZodGenerator
             ]),
           ]),
           type: this.#zSchemaType(
-            t.tsUnionType([
-              unionTypeIn,
-              t.tsLiteralType(t.stringLiteral("unknown")),
-            ]),
-            t.tsUnionType([
-              unionTypeOut,
-              t.tsLiteralType(t.stringLiteral("unknown")),
-            ]),
+            t.tsUnionType([unionTypeIn, t.tsLiteralType(t.stringLiteral("unknown"))]),
+            t.tsUnionType([unionTypeOut, t.tsLiteralType(t.stringLiteral("unknown"))]),
           ),
         };
       }
@@ -824,20 +687,12 @@ export class ZodGenerator
 
     const anyOrOneOf = schema.oneOf || schema.anyOf;
     if (anyOrOneOf) {
-      const schemas = anyOrOneOf.map((s) =>
-        this.#getZodSchema(document, s, ctx),
-      );
+      const schemas = anyOrOneOf.map((s) => this.#getZodSchema(document, s, ctx));
       return {
-        schema: this.#z("union", [
-          t.arrayExpression(schemas.map((s) => s.schema)),
-        ]),
+        schema: this.#z("union", [t.arrayExpression(schemas.map((s) => s.schema))]),
         type: this.#zSchemaType(
-          t.tsUnionType(
-            schemas.map((s) => this.#zResolvedType("input", s.type)),
-          ),
-          t.tsUnionType(
-            schemas.map((s) => this.#zResolvedType("output", s.type)),
-          ),
+          t.tsUnionType(schemas.map((s) => this.#zResolvedType("input", s.type))),
+          t.tsUnionType(schemas.map((s) => this.#zResolvedType("output", s.type))),
         ),
       };
     }
@@ -854,9 +709,7 @@ export class ZodGenerator
       const literals = schema.enum.map(this.#literal);
       return {
         schema: this.#z("enum", [t.arrayExpression(literals)]),
-        type: this.#zSchemaType(
-          t.tsUnionType(literals.map((l) => t.tsLiteralType(l))),
-        ),
+        type: this.#zSchemaType(t.tsUnionType(literals.map((l) => t.tsLiteralType(l)))),
       };
     }
 
@@ -879,16 +732,10 @@ export class ZodGenerator
           return schemas[0]!;
         }
         return {
-          schema: this.#z("union", [
-            t.arrayExpression(schemas.map((s) => s.schema)),
-          ]),
+          schema: this.#z("union", [t.arrayExpression(schemas.map((s) => s.schema))]),
           type: this.#zSchemaType(
-            t.tsUnionType(
-              schemas.map((s) => this.#zResolvedType("input", s.type)),
-            ),
-            t.tsUnionType(
-              schemas.map((s) => this.#zResolvedType("output", s.type)),
-            ),
+            t.tsUnionType(schemas.map((s) => this.#zResolvedType("input", s.type))),
+            t.tsUnionType(schemas.map((s) => this.#zResolvedType("output", s.type))),
           ),
         };
       }
@@ -904,18 +751,12 @@ export class ZodGenerator
         const formatOverride = this.#options.overrideFormats?.[schema.format];
         if (formatOverride) {
           if (formatOverride.type === "import") {
-            ensureImport(
-              this.#imports,
-              formatOverride.name,
-              formatOverride.from,
-            );
+            ensureImport(this.#imports, formatOverride.name, formatOverride.from);
             return {
               schema: t.callExpression(t.identifier(formatOverride.name), []),
               type: t.tsTypeReference(
                 t.identifier("ReturnType"),
-                t.tsTypeParameterInstantiation([
-                  t.tsTypeQuery(t.identifier(formatOverride.name)),
-                ]),
+                t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(formatOverride.name))]),
               ),
             };
           }
@@ -930,9 +771,7 @@ export class ZodGenerator
             schema: t.callExpression(t.identifier(override.name), []),
             type: t.tsTypeReference(
               t.identifier("ReturnType"),
-              t.tsTypeParameterInstantiation([
-                t.tsTypeQuery(t.identifier(override.name)),
-              ]),
+              t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(override.name))]),
             ),
           };
         }
@@ -1007,11 +846,7 @@ export class ZodGenerator
           elements[index]!.callee.property.name === "null" &&
           t.isExpression(elements[1 - index])
         ) {
-          zodSchema.schema = this.#z(
-            "nullable",
-            [elements[1 - index] as t.Expression],
-            true,
-          );
+          zodSchema.schema = this.#z("nullable", [elements[1 - index] as t.Expression], true);
         }
       }
     }
@@ -1048,9 +883,7 @@ export class ZodGenerator
                     [zodSchema.schema],
                     true,
                     t.tsTypeParameterInstantiation([
-                      t.tsLiteralType(
-                        t.stringLiteral(schema["x-sohcah-brand-id"]),
-                      ),
+                      t.tsLiteralType(t.stringLiteral(schema["x-sohcah-brand-id"])),
                       t.tsLiteralType(t.stringLiteral("inout")),
                     ]),
                   ),
@@ -1075,10 +908,7 @@ export class ZodGenerator
     return zodSchema;
   }
 
-  async visitSchema(
-    document: ApiDocument,
-    ref: SchemaReferenceType,
-  ): Promise<void> {
+  async visitSchema(document: ApiDocument, ref: SchemaReferenceType): Promise<void> {
     this.#getZodSchema(document, ref, {});
   }
 
@@ -1094,10 +924,7 @@ export class ZodGenerator
       this.#createCodec(
         this.#z("object", [
           t.objectExpression([
-            t.objectProperty(
-              t.identifier("contentType"),
-              this.#z("string", []),
-            ),
+            t.objectProperty(t.identifier("contentType"), this.#z("string", [])),
             t.objectProperty(t.identifier("content"), this.#z("string", [])),
           ]),
         ]),
@@ -1129,9 +956,7 @@ export class ZodGenerator
 
     const schema = dereferenceSchema(document, content.schema);
     if (!("type" in schema) || schema.type !== "object") {
-      console.warn(
-        `Unsupported multipart/form-data schema for operation ${operationKey}`,
-      );
+      console.warn(`Unsupported multipart/form-data schema for operation ${operationKey}`);
       return null;
     }
 
@@ -1154,9 +979,7 @@ export class ZodGenerator
 
     encode.body.push(
       t.returnStatement(
-        t.objectExpression([
-          t.objectProperty(t.identifier("content"), t.identifier("formData")),
-        ]),
+        t.objectExpression([t.objectProperty(t.identifier("content"), t.identifier("formData"))]),
       ),
     );
 
@@ -1186,22 +1009,17 @@ export class ZodGenerator
       content: MediaTypeObject,
     ) => [t.Expression, ZodBodyOption] | null
   > = {
-    "application/json": (document, _, content) =>
-      this.#jsonBodyHandler(document, content),
+    "application/json": (document, _, content) => this.#jsonBodyHandler(document, content),
     "multipart/form-data": (document, operationKey, content) =>
       this.#multipartFormDataBodyHandler(document, operationKey, content),
   };
 
-  async #addOperationParameters(
-    document: ApiDocument,
-    ref: OperationReference,
-  ): Promise<void> {
-
+  async #addOperationParameters(document: ApiDocument, ref: OperationReference): Promise<void> {
     let hasUsedValueIdentifier = false;
     const valueIdentifier = () => {
       hasUsedValueIdentifier = true;
       return t.identifier("value");
-    }
+    };
 
     const operationKey = getOperationKey(ref);
 
@@ -1223,10 +1041,7 @@ export class ZodGenerator
           parameter.required ? schema : this.#z("optional", [schema], true),
         ),
       );
-      const parameterValue = stringMemberExpression(
-        valueIdentifier(),
-        parameter.name,
-      );
+      const parameterValue = stringMemberExpression(valueIdentifier(), parameter.name);
       if (parameter.in === "path") {
         pathParameters[parameter.name] = parameterValue;
       }
@@ -1271,18 +1086,14 @@ export class ZodGenerator
 
       const contentOptions = new Map<string, t.Expression>();
 
-      for (const [contentType, content] of Object.entries(
-        requestBody.content ?? {},
-      )) {
+      for (const [contentType, content] of Object.entries(requestBody.content ?? {})) {
         const key = JSON.stringify(content);
         if (contentOptions.has(key)) continue;
 
         const bodyHandler = this.#bodyHandlers[contentType];
 
         if (!bodyHandler) {
-          console.warn(
-            `Unsupported body type ${contentType} for operation ${operationKey}`,
-          );
+          console.warn(`Unsupported body type ${contentType} for operation ${operationKey}`);
           continue;
         }
 
@@ -1357,10 +1168,7 @@ export class ZodGenerator
           queryStatements.body.length ? t.identifier("queryParams") : null,
         ),
       ),
-      t.objectProperty(
-        t.identifier("method"),
-        t.stringLiteral(ref.methodKey.toUpperCase()),
-      ),
+      t.objectProperty(t.identifier("method"), t.stringLiteral(ref.methodKey.toUpperCase())),
     ]);
 
     if (headerStatements.body.length > 0) {
@@ -1405,17 +1213,12 @@ export class ZodGenerator
     );
   }
 
-  async #addOperationResponse(
-    document: ApiDocument,
-    ref: OperationReference,
-  ): Promise<void> {
+  async #addOperationResponse(document: ApiDocument, ref: OperationReference): Promise<void> {
     const operationKey = getOperationKey(ref);
 
     const responseOptions = t.arrayExpression([]);
 
-    for (const [status, responseRef] of Object.entries(
-      ref.operation.responses ?? {},
-    )) {
+    for (const [status, responseRef] of Object.entries(ref.operation.responses ?? {})) {
       const response = dereference(responseRef);
       if (!response.content) {
         responseOptions.elements.push(
@@ -1427,14 +1230,8 @@ export class ZodGenerator
                   t.identifier("code"),
                   this.#z("literal", [t.numericLiteral(Number(status))]),
                 ),
-                t.objectProperty(
-                  t.identifier("contentType"),
-                  this.#z("string", []),
-                ),
-                t.objectProperty(
-                  t.identifier("response"),
-                  this.#ensureBlobResponseCodec(),
-                ),
+                t.objectProperty(t.identifier("contentType"), this.#z("string", [])),
+                t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
               ]),
             ]),
           ),
@@ -1442,9 +1239,8 @@ export class ZodGenerator
       } else {
         const statusResponses = t.arrayExpression([]);
 
-        for (const entry of Map.groupBy(
-          Object.entries(response.content ?? {}),
-          (i) => JSON.stringify(i[1]),
+        for (const entry of Map.groupBy(Object.entries(response.content ?? {}), (i) =>
+          JSON.stringify(i[1]),
         ).values()) {
           const contentTypes = entry.map((i) => i[0]);
           const content = dereference(entry[0]![1]);
@@ -1454,11 +1250,7 @@ export class ZodGenerator
             );
             continue;
           }
-          const schema = this.#getZodSchema(
-            document,
-            content.schema,
-            {},
-          ).schema;
+          const schema = this.#getZodSchema(document, content.schema, {}).schema;
           statusResponses.elements.push(
             this.#z("object", [
               t.objectExpression([
@@ -1469,9 +1261,7 @@ export class ZodGenerator
                 t.objectProperty(
                   t.identifier("contentType"),
                   this.#z("literal", [
-                    t.arrayExpression(
-                      contentTypes.map((i) => t.stringLiteral(i)),
-                    ),
+                    t.arrayExpression(contentTypes.map((i) => t.stringLiteral(i))),
                   ]),
                 ),
                 t.objectProperty(
@@ -1486,10 +1276,7 @@ export class ZodGenerator
         responseOptions.elements.push(
           comment(
             response.description,
-            this.#z("discriminatedUnion", [
-              t.stringLiteral("contentType"),
-              statusResponses,
-            ]),
+            this.#z("discriminatedUnion", [t.stringLiteral("contentType"), statusResponses]),
           ),
         );
       }
@@ -1500,20 +1287,14 @@ export class ZodGenerator
         t.variableDeclaration("const", [
           t.variableDeclarator(
             t.identifier(`${operationKey}_Response`),
-            this.#z("discriminatedUnion", [
-              t.stringLiteral("code"),
-              responseOptions,
-            ]),
+            this.#z("discriminatedUnion", [t.stringLiteral("code"), responseOptions]),
           ),
         ]),
       ),
     );
   }
 
-  async visitOperation(
-    document: ApiDocument,
-    ref: OperationReference,
-  ): Promise<void> {
+  async visitOperation(document: ApiDocument, ref: OperationReference): Promise<void> {
     this.#addOperationParameters(document, ref);
 
     this.#addOperationResponse(document, ref);
@@ -1529,104 +1310,81 @@ export class ZodGenerator
     await writeFile(this.#options.output, generate(program).code);
   }
 
-  [JsSchemaGeneratorExtension]: OpenApiJsSchemaGenerator[typeof JsSchemaGeneratorExtension] =
-    {
-      getParameterType: async (doc, ref) => {
-        ensureImport(doc.imports, "z", "zod");
-        const schemaName = `${getOperationKey(ref)}_Parameters`;
-        ensureImport(
-          doc.imports,
-          schemaName,
-          relativeImportPath(
-            doc.path,
-            this.#options.output,
-            doc.importExtensions,
+  [JsSchemaGeneratorExtension]: OpenApiJsSchemaGenerator[typeof JsSchemaGeneratorExtension] = {
+    getParameterType: async (doc, ref) => {
+      ensureImport(doc.imports, "z", "zod");
+      const schemaName = `${getOperationKey(ref)}_Parameters`;
+      ensureImport(
+        doc.imports,
+        schemaName,
+        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+      );
+      return this.#zResolvedType("output", t.tsTypeQuery(t.identifier(schemaName)));
+    },
+    encodeParameters: async (doc, ref, parameters) => {
+      ensureImport(doc.imports, "z", "zod");
+      const schemaName = `${getOperationKey(ref)}_Parameters`;
+      ensureImport(
+        doc.imports,
+        schemaName,
+        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+      );
+      return this.#z("encodeAsync", [t.identifier(schemaName), parameters]);
+    },
+    getResponseType: async (doc, ref) => {
+      ensureImport(doc.imports, "z", "zod");
+      const schemaName = `${getOperationKey(ref)}_Response`;
+      ensureImport(
+        doc.imports,
+        schemaName,
+        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+      );
+      return this.#zResolvedType("output", t.tsTypeQuery(t.identifier(schemaName)));
+    },
+    parseResponse: async (doc, ref, response) => {
+      ensureImport(doc.imports, "z", "zod");
+      const schemaName = `${getOperationKey(ref)}_Response`;
+      ensureImport(
+        doc.imports,
+        schemaName,
+        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+      );
+      return this.#z("parseAsync", [
+        t.identifier(schemaName),
+        t.objectExpression([
+          t.objectProperty(
+            t.identifier("code"),
+            t.memberExpression(response, t.identifier("status")),
           ),
-        );
-        return this.#zResolvedType(
-          "output",
-          t.tsTypeQuery(t.identifier(schemaName)),
-        );
-      },
-      encodeParameters: async (doc, ref, parameters) => {
-        ensureImport(doc.imports, "z", "zod");
-        const schemaName = `${getOperationKey(ref)}_Parameters`;
-        ensureImport(
-          doc.imports,
-          schemaName,
-          relativeImportPath(
-            doc.path,
-            this.#options.output,
-            doc.importExtensions,
-          ),
-        );
-        return this.#z("encodeAsync", [t.identifier(schemaName), parameters]);
-      },
-      getResponseType: async (doc, ref) => {
-        ensureImport(doc.imports, "z", "zod");
-        const schemaName = `${getOperationKey(ref)}_Response`;
-        ensureImport(
-          doc.imports,
-          schemaName,
-          relativeImportPath(
-            doc.path,
-            this.#options.output,
-            doc.importExtensions,
-          ),
-        );
-        return this.#zResolvedType(
-          "output",
-          t.tsTypeQuery(t.identifier(schemaName)),
-        );
-      },
-      parseResponse: async (doc, ref, response) => {
-        ensureImport(doc.imports, "z", "zod");
-        const schemaName = `${getOperationKey(ref)}_Response`;
-        ensureImport(
-          doc.imports,
-          schemaName,
-          relativeImportPath(
-            doc.path,
-            this.#options.output,
-            doc.importExtensions,
-          ),
-        );
-        return this.#z("parseAsync", [
-          t.identifier(schemaName),
-          t.objectExpression([
-            t.objectProperty(
-              t.identifier("code"),
-              t.memberExpression(response, t.identifier("status")),
-            ),
-            t.objectProperty(
-              t.identifier("contentType"),
-              t.optionalMemberExpression(
-                t.optionalCallExpression(
-                  t.optionalMemberExpression(
-                    t.callExpression(
-                      t.memberExpression(
-                        t.memberExpression(response, t.identifier("headers")),
-                        t.identifier("get"),
-                      ),
-                      [t.stringLiteral("Content-Type")],
+          t.objectProperty(
+            t.identifier("contentType"),
+            t.optionalMemberExpression(
+              t.optionalCallExpression(
+                t.optionalMemberExpression(
+                  t.callExpression(
+                    t.memberExpression(
+                      t.memberExpression(response, t.identifier("headers")),
+                      t.identifier("get"),
                     ),
-                    t.identifier("split"),
-                    false,
-                    true,
+                    [t.stringLiteral("Content-Type")],
                   ),
-                  [t.stringLiteral(";")],
+                  t.identifier("split"),
                   false,
+                  true,
                 ),
-                t.numericLiteral(0),
-                true,
-                true,
+                [t.stringLiteral(";")],
+                false,
               ),
+              t.numericLiteral(0),
+              true,
+              true,
             ),
-            t.objectProperty(t.identifier("response"), response),
-          ]),
-        ]);
-      },
-    };
+          ),
+          t.objectProperty(t.identifier("response"), response),
+        ]),
+      ]);
+    },
+  };
 }
 
 export function createZodGenerator(options: ZodGeneratorOptions) {

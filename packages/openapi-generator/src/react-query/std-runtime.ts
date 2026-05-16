@@ -1,4 +1,6 @@
-export class ApiError<T extends { code: number; contentType: string; response: unknown }> extends Error {
+export class ApiError<
+  T extends { code: number; contentType: string; response: unknown },
+> extends Error {
   result: T;
   readonly isResponse: true = true;
 
@@ -18,12 +20,14 @@ export class ApiError<T extends { code: number; contentType: string; response: u
   }
 }
 
-type ApiErrorType<T extends { code: number; contentType: string; response: unknown }> = T extends { code: 200 }
+type ApiErrorType<T extends { code: number; contentType: string; response: unknown }> = T extends {
+  code: 200;
+}
   ? never
   : ApiError<T>;
 
 export function getApiResult<T extends { code: number; contentType: string; response: unknown }>(
-  result: T
+  result: T,
 ):
   | {
       type: "success";

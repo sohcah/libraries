@@ -4,7 +4,7 @@ import escapeRegex from "regex-escape";
 export function generatePathExpression(
   path: string,
   pathParameters: Record<string, t.Expression>,
-  queryParameter: t.Expression | null
+  queryParameter: t.Expression | null,
 ): t.TemplateLiteral {
   let modifiedPath = path;
   if (queryParameter) {
@@ -16,8 +16,8 @@ export function generatePathExpression(
       `\\{(${Object.keys(pathParameters)
         .map((i) => escapeRegex(i))
         .join("|")})\\}`,
-      "g"
-    )
+      "g",
+    ),
   );
 
   const quasis: t.TemplateElement[] = [];

@@ -5,10 +5,7 @@ export function first(value: string, upperLower: "upper" | "lower") {
   return `${value[0]![upperLower === "upper" ? "toUpperCase" : "toLowerCase"]()}${value.slice(1)}`;
 }
 
-export function getOperationKey(
-  ref: OperationReference,
-  firstLetter: "upper" | "lower" = "upper",
-) {
+export function getOperationKey(ref: OperationReference, firstLetter: "upper" | "lower" = "upper") {
   return first(
     ref.operation.operationId ??
       `${ref.methodKey}${first(

@@ -20,7 +20,10 @@ export type OperationReference = {
   operation: OperationObject;
 };
 
-export function dereferenceSchema(document: ApiDocument, schema: SchemaReferenceType): SchemaObject {
+export function dereferenceSchema(
+  document: ApiDocument,
+  schema: SchemaReferenceType,
+): SchemaObject {
   if ("$ref-value" in schema) {
     return schema["$ref-value"] as SchemaObject;
   }
@@ -35,14 +38,8 @@ export function dereference<T extends object>(ref: OA.ReferenceType<T>): T {
 }
 
 export interface OpenApiGenerator {
-  visitOperation?: (
-    document: ApiDocument,
-    ref: OperationReference,
-  ) => Promise<void>;
-  visitSchema?: (
-    document: ApiDocument,
-    ref: SchemaReferenceType,
-  ) => Promise<void>;
+  visitOperation?: (document: ApiDocument, ref: OperationReference) => Promise<void>;
+  visitSchema?: (document: ApiDocument, ref: SchemaReferenceType) => Promise<void>;
 
   complete: () => Promise<void>;
 }

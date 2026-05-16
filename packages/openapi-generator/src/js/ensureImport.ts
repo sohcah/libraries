@@ -15,9 +15,7 @@ export function ensureImport(
     imports.push(existingImport);
   }
   if (
-    !existingImport.specifiers.find(
-      (s) => s.type === "ImportSpecifier" && s.local.name === name,
-    )
+    !existingImport.specifiers.find((s) => s.type === "ImportSpecifier" && s.local.name === name)
   ) {
     const specifier = t.importSpecifier(identifier, identifier);
     if (typeOnly) specifier.importKind = "type";
@@ -27,11 +25,7 @@ export function ensureImport(
   return identifier;
 }
 
-export function ensureNamespaceImport(
-  imports: t.ImportDeclaration[],
-  name: string,
-  from: string,
-) {
+export function ensureNamespaceImport(imports: t.ImportDeclaration[], name: string, from: string) {
   const identifier = t.identifier(name);
 
   const existingImport = imports.find((i) => i.source.value === from);
@@ -47,10 +41,7 @@ export function ensureNamespaceImport(
   }
 
   imports.push(
-    t.importDeclaration(
-      [t.importNamespaceSpecifier(identifier)],
-      t.stringLiteral(from),
-    ),
+    t.importDeclaration([t.importNamespaceSpecifier(identifier)], t.stringLiteral(from)),
   );
   return identifier;
 }
