@@ -214,6 +214,83 @@ export class ZodGenerator
   #ensureJsonResponseCodec(): t.Expression {
     if (!this.#hasJsonResponseCodec) {
       this.#hasJsonResponseCodec = true;
+      const decode = t.arrowFunctionExpression(
+        [t.identifier("response"), t.identifier("ctx")],
+        t.blockStatement([
+          t.tryStatement(
+            t.blockStatement([
+              t.returnStatement(
+                t.awaitExpression(
+                  t.callExpression(
+                    t.memberExpression(
+                      t.identifier("response"),
+                      t.identifier("json"),
+                    ),
+                    [],
+                  ),
+                ),
+              ),
+            ]),
+            t.catchClause(
+              Object.assign(t.identifier("error"), {
+                typeAnnotation: t.tsTypeAnnotation(
+                  t.tsUnknownKeyword(),
+                ),
+              }),
+              t.blockStatement([
+                t.expressionStatement(
+                  t.callExpression(
+                    t.memberExpression(
+                      t.memberExpression(
+                        t.identifier("ctx"),
+                        t.identifier("issues"),
+                      ),
+                      t.identifier("push"),
+                    ),
+                    [
+                      t.objectExpression([
+                        t.objectProperty(
+                          t.identifier("code"),
+                          t.stringLiteral("custom"),
+                        ),
+                        t.objectProperty(
+                          t.identifier("input"),
+                          t.identifier("error"),
+                        ),
+                        t.objectProperty(
+                          t.identifier("message"),
+                          t.memberExpression(
+                            t.tsAsExpression(
+                              t.identifier("error"),
+                              t.tsTypeReference(t.identifier("Error")),
+                            ),
+                            t.identifier("message"),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+                t.returnStatement(
+                  t.memberExpression(
+                    t.identifier("z"),
+                    t.identifier("NEVER"),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ]),
+        true,
+      );
+      decode.returnType = t.tsTypeAnnotation(
+        t.tsTypeReference(
+          t.identifier("Promise"),
+          t.tsTypeParameterInstantiation([
+            t.tsUnknownKeyword(),
+          ]),
+        )
+      );
       this.#header.push(
         t.variableDeclaration("const", [
           t.variableDeclarator(
@@ -221,75 +298,7 @@ export class ZodGenerator
             this.#createCodec(
               this.#z("instanceof", [t.identifier("Response")]),
               this.#z("unknown", []),
-              t.arrowFunctionExpression(
-                [t.identifier("response"), t.identifier("ctx")],
-                t.blockStatement([
-                  t.tryStatement(
-                    t.blockStatement([
-                      t.returnStatement(
-                        t.awaitExpression(
-                          t.callExpression(
-                            t.memberExpression(
-                              t.identifier("response"),
-                              t.identifier("json"),
-                            ),
-                            [],
-                          ),
-                        ),
-                      ),
-                    ]),
-                    t.catchClause(
-                      Object.assign(t.identifier("error"), {
-                        typeAnnotation: t.tsTypeAnnotation(
-                          t.tsUnknownKeyword(),
-                        ),
-                      }),
-                      t.blockStatement([
-                        t.expressionStatement(
-                          t.callExpression(
-                            t.memberExpression(
-                              t.memberExpression(
-                                t.identifier("ctx"),
-                                t.identifier("issues"),
-                              ),
-                              t.identifier("push"),
-                            ),
-                            [
-                              t.objectExpression([
-                                t.objectProperty(
-                                  t.identifier("code"),
-                                  t.stringLiteral("custom"),
-                                ),
-                                t.objectProperty(
-                                  t.identifier("input"),
-                                  t.identifier("error"),
-                                ),
-                                t.objectProperty(
-                                  t.identifier("message"),
-                                  t.memberExpression(
-                                    t.tsAsExpression(
-                                      t.identifier("error"),
-                                      t.tsTypeReference(t.identifier("Error")),
-                                    ),
-                                    t.identifier("message"),
-                                  ),
-                                ),
-                              ]),
-                            ],
-                          ),
-                        ),
-                        t.returnStatement(
-                          t.memberExpression(
-                            t.identifier("z"),
-                            t.identifier("NEVER"),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  ),
-                ]),
-                true,
-              ),
+              decode,
               this.#ensureNotImplementedFunction(),
             ),
           ),
@@ -382,6 +391,23 @@ export class ZodGenerator
       t.tsQualifiedName(t.identifier("z"), t.identifier(variant)),
       t.tsTypeParameterInstantiation([type]),
     );
+  }
+
+  #zObjectShape(object: t.Expression): t.Expression {
+    // If object is a z.object(...), return the ... directly rather than z.object(...).shape
+    if (
+      t.isCallExpression(object) &&
+      t.isMemberExpression(object.callee) &&
+      t.isIdentifier(object.callee.object) &&
+      object.callee.object.name === "z" &&
+      t.isIdentifier(object.callee.property) &&
+      object.callee.property.name === "object" &&
+      object.arguments.length === 1 &&
+      object.arguments[0]?.type === "ObjectExpression"
+    ) {
+      return object.arguments[0];
+    }
+    return t.memberExpression(object, t.identifier("shape"));
   }
 
   #z(
@@ -626,9 +652,8 @@ export class ZodGenerator
             .reduce((a, b) =>
               this.#z(
                 "extend",
-                // TODO: Avoid .shape call for z.object(...).shape
-                [a, t.memberExpression(b, t.identifier("shape"))],
-                true,
+                [a, this.#zObjectShape(b)],
+                true
               ),
             )
         : schemas
@@ -802,8 +827,6 @@ export class ZodGenerator
       const schemas = anyOrOneOf.map((s) =>
         this.#getZodSchema(document, s, ctx),
       );
-      // TODO: Use z.discriminatedUnion when there is a discriminator.
-      // TODO: Support x-sohcah-extensible-union to add Unknown symbol
       return {
         schema: this.#z("union", [
           t.arrayExpression(schemas.map((s) => s.schema)),
@@ -916,7 +939,7 @@ export class ZodGenerator
       }
 
       if (schema.type === "string") {
-        if (schema.contentMediaType) {
+        if (schema.contentMediaType || schema.format === "binary") {
           return {
             schema: this.#z("instanceof", [t.identifier("Blob")]),
             type: this.#zSchemaType(t.tsTypeReference(t.identifier("Blob"))),
@@ -1173,6 +1196,13 @@ export class ZodGenerator
     document: ApiDocument,
     ref: OperationReference,
   ): Promise<void> {
+
+    let hasUsedValueIdentifier = false;
+    const valueIdentifier = () => {
+      hasUsedValueIdentifier = true;
+      return t.identifier("value");
+    }
+
     const operationKey = getOperationKey(ref);
 
     const objectExpression = t.objectExpression([]);
@@ -1194,7 +1224,7 @@ export class ZodGenerator
         ),
       );
       const parameterValue = stringMemberExpression(
-        t.identifier("value"),
+        valueIdentifier(),
         parameter.name,
       );
       if (parameter.in === "path") {
@@ -1285,7 +1315,7 @@ export class ZodGenerator
           t.identifier("headers"),
           "Content-Type",
           t.memberExpression(
-            t.memberExpression(t.identifier("value"), t.identifier("data")),
+            t.memberExpression(valueIdentifier(), t.identifier("data")),
             t.identifier("contentType"),
           ),
           { type: "string" },
@@ -1344,7 +1374,7 @@ export class ZodGenerator
         t.objectProperty(
           t.identifier("body"),
           t.memberExpression(
-            t.memberExpression(t.identifier("value"), t.identifier("data")),
+            t.memberExpression(valueIdentifier(), t.identifier("data")),
             t.identifier("content"),
           ),
         ),
@@ -1364,7 +1394,7 @@ export class ZodGenerator
                 this.#z("object", [objectExpression]),
                 this.#ensureNotImplementedFunction(),
                 t.arrowFunctionExpression(
-                  [t.identifier("value")],
+                  hasUsedValueIdentifier ? [valueIdentifier()] : [],
                   parameterEncode,
                 ),
               ),

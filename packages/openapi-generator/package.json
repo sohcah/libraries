@@ -35,6 +35,10 @@
       "default": "./dist/react-query/index.mjs",
       "types": "./dist/react-query/index.d.mts"
     },
+    "./react-query/std-runtime": {
+      "default": "./dist/react-query/std-runtime.mjs",
+      "types": "./dist/react-query/std-runtime.d.mts"
+    },
     "./zod": {
       "default": "./dist/zod/index.mjs",
       "types": "./dist/zod/index.d.mts"

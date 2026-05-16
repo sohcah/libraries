@@ -6,6 +6,7 @@ export default defineConfig({
     "./src/config.ts",
     // "./src/cli.ts",
     "./src/react-query/index.ts",
+    "./src/react-query/std-runtime.ts",
     "./src/zod/index.ts",
     "./src/generate.ts",
   ],

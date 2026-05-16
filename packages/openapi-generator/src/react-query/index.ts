@@ -19,11 +19,19 @@ import {
   type ImportExtensionsBehaviour,
 } from "../js/ensureImport.ts";
 
+const DEFAULT_RUNTIME = "@sohcah/openapi-generator/react-query/std-runtime";
+
 interface ReactQueryGeneratorOptionsBase {
   output: string;
 
   /** @default "retain" */
   importExtensions?: ImportExtensionsBehaviour;
+
+  /**
+   * An import to get `getApiResult` and `getUnexpectedResult` functions from.
+   * @default "@sohcah/openapi-generator/react-query/std-runtime"
+   */
+  runtime?: string;
 }
 
 interface ReactQueryGeneratorInternalOptions
@@ -36,7 +44,17 @@ interface ReactQueryGeneratorOptions<T extends string>
   schemaGenerator: T;
 }
 
-function createQueryFn(): t.FunctionDeclaration {
+function createQueryFn(doc: JsDocument, runtime: string): t.FunctionDeclaration {
+  ensureImport(
+    doc.imports,
+    "getApiResult",
+    runtime,
+  );
+  ensureImport(
+    doc.imports,
+    "getUnexpectedResult",
+    runtime,
+  );
   const paramsParam = t.restElement(t.identifier("params"));
   paramsParam.typeAnnotation = t.tsTypeAnnotation(t.tsTypeReference(t.identifier("P")));
   const fnParam  = t.identifier("fn");
@@ -72,7 +90,7 @@ function createQueryFn(): t.FunctionDeclaration {
                 ),
                 [
                   t.identifier("getApiResult"),
-                  t.identifier("getUnexpectedError"),
+                  t.identifier("getUnexpectedResult"),
                 ]
               )
               )),
@@ -124,6 +142,79 @@ function createQueryFn(): t.FunctionDeclaration {
     ),
   ]);
   return fn;
+}
+
+function createQueryResultType(doc: JsDocument, runtime: string, type: "Success" | "Error"): t.TSTypeAliasDeclaration {
+  ensureImport(
+    doc.imports,
+    "getApiResult",
+    runtime,
+    true,
+  );
+  ensureImport(
+    doc.imports,
+    "getUnexpectedResult",
+    runtime,
+    true,
+  );
+  return t.tsTypeAliasDeclaration(
+    t.identifier("Query" + type),
+    t.tsTypeParameterDeclaration([
+      t.tsTypeParameter(
+        t.tsTypeLiteral([
+          t.tsPropertySignature(
+            t.identifier("code"),
+            t.tsTypeAnnotation(t.tsNumberKeyword()),
+          ),
+          t.tsPropertySignature(
+            t.identifier("contentType"),
+            t.tsTypeAnnotation(t.tsStringKeyword()),
+          ),
+          t.tsPropertySignature(
+            t.identifier("response"),
+            t.tsTypeAnnotation(t.tsUnknownKeyword()),
+          ),
+        ]),
+        null,
+        "T"
+      )
+    ]),
+    t.tsIndexedAccessType(
+      t.tsTypeReference(
+        t.identifier("Extract"),
+        t.tsTypeParameterInstantiation([
+          t.tsUnionType([
+            // ReturnType<typeof getApiResult<T>>
+            t.tsTypeReference(
+              t.identifier("ReturnType"),
+              t.tsTypeParameterInstantiation([
+                t.tsTypeQuery(
+                  t.identifier("getApiResult"),
+                  t.tsTypeParameterInstantiation([t.tsTypeReference(t.identifier("T"))]),
+                )
+              ])
+            ),
+            // ReturnType<typeof getUnexpectedResult>
+            t.tsTypeReference(
+              t.identifier("ReturnType"),
+              t.tsTypeParameterInstantiation([
+                t.tsTypeQuery(
+                  t.identifier("getUnexpectedResult"),
+                )
+              ])
+            )
+          ]),
+          t.tsTypeLiteral([
+            t.tsPropertySignature(
+              t.identifier("type"),
+              t.tsTypeAnnotation(t.tsLiteralType(t.stringLiteral(type === "Success" ? "success" : "error"))),
+            ),
+          ])
+        ])
+      ),
+      t.tsLiteralType(t.stringLiteral(type === "Success" ? "data" : "error"))
+    )
+  );
 }
 
 export class ReactQueryGenerator implements OpenApiGenerator {
@@ -376,30 +467,22 @@ export class ReactQueryGenerator implements OpenApiGenerator {
         ]),
       ],
     );
-    const resultTypeReference = t.tsIndexedAccessType(
-      t.tsTypeReference(
-        t.identifier("Extract"),
-        t.tsTypeParameterInstantiation([
-          await this.#options.schemaGenerator[
-            JsSchemaGeneratorExtension
-          ].getResponseType(this.#doc, ref),
-          t.tsTypeLiteral([
-            t.tsPropertySignature(
-              t.identifier("code"),
-              t.tsTypeAnnotation(t.tsLiteralType(t.numericLiteral(200))),
-            ),
-          ]),
-        ]),
-      ),
-      t.tsLiteralType(t.stringLiteral("response")),
+    const responseType = t.tsTypeParameterInstantiation([
+      await this.#options.schemaGenerator[
+        JsSchemaGeneratorExtension
+      ].getResponseType(this.#doc, ref),
+    ]);
+    const resultTypeReference = (type: "Success" | "Error") => t.tsTypeReference(
+      t.identifier("Query" + type),
+      responseType,
     );
     optionsCall.typeParameters = t.tsTypeParameterInstantiation([
-      resultTypeReference,
-      t.tsTypeReference(t.identifier("Error")),
+      resultTypeReference("Success"),
+      resultTypeReference("Error"),
       ...(isMutation ? [
         parametersType
       ] : [
-        resultTypeReference,
+        resultTypeReference("Success"),
         t.tsTypeReference(t.identifier("QueryKey")),
       ]),
     ]);
@@ -419,9 +502,15 @@ export class ReactQueryGenerator implements OpenApiGenerator {
   }
 
   async complete(): Promise<void> {
+    const runtime = this.#options.runtime ?? DEFAULT_RUNTIME;
+    const queryFn = createQueryFn(this.#doc, runtime);
+    const queryResultTypeSuccess = createQueryResultType(this.#doc, runtime, "Success");
+    const queryResultTypeError = createQueryResultType(this.#doc, runtime, "Error");
     const program = t.program([
       ...this.#doc.imports,
-      createQueryFn(),
+      queryFn,
+      queryResultTypeSuccess,
+      queryResultTypeError,
       t.exportNamedDeclaration(
         t.classDeclaration(t.identifier("Api"), null, this.#apiBody),
       ),
