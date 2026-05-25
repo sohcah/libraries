@@ -10,8 +10,11 @@ import * as t from "@babel/types";
 import { writeFile } from "node:fs/promises";
 import { generate } from "@babel/generator";
 import { first, getOperationKey } from "../helpers.js";
-import { stringLiteralOrIdentifier } from "../js/stringLiteralOrIdentifier.js";
-import { ensureImport, type ImportExtensionsBehaviour } from "../js/ensureImport.ts";
+import {
+  stringLiteralOrIdentifier,
+  stringMemberExpression,
+} from "../js/stringLiteralOrIdentifier.js";
+import { ensureImport, type ImportExtensionsBehaviour } from "../js/ensureImport.js";
 
 const DEFAULT_RUNTIME = "@sohcah/openapi-generator/react-query/std-runtime";
 
@@ -206,10 +209,9 @@ export class ReactQueryGenerator implements OpenApiGenerator {
                 // t.callExpression(t.identifier("queryFn"), [
                 t.arrowFunctionExpression(
                   [parameters],
-                  t.callExpression(
-                    t.memberExpression(t.thisExpression(), t.identifier(operationKey)),
-                    [parameters],
-                  ),
+                  t.callExpression(stringMemberExpression(t.thisExpression(), operationKey), [
+                    parameters,
+                  ]),
                   true,
                 ),
                 // ]),
@@ -226,10 +228,9 @@ export class ReactQueryGenerator implements OpenApiGenerator {
                   t.arrowFunctionExpression(
                     [],
                     t.awaitExpression(
-                      t.callExpression(
-                        t.memberExpression(t.thisExpression(), t.identifier(operationKey)),
-                        [parametersWithSkipToken],
-                      ),
+                      t.callExpression(stringMemberExpression(t.thisExpression(), operationKey), [
+                        parametersWithSkipToken,
+                      ]),
                     ),
                     true,
                   ),
@@ -254,12 +255,16 @@ export class ReactQueryGenerator implements OpenApiGenerator {
         : [resultTypeReference("Success"), t.tsTypeReference(t.identifier("QueryKey"))]),
     ]);
 
+    const methodName = stringLiteralOrIdentifier(
+      operationKey + (isMutation ? "Mutation" : "Query"),
+    );
     this.#apiBody.body.push(
       t.classMethod(
         "method",
-        t.identifier(operationKey + (isMutation ? "Mutation" : "Query")),
+        methodName,
         isMutation ? [] : [parametersWithSkipToken],
         t.blockStatement([t.returnStatement(optionsCall)]),
+        methodName.type === "StringLiteral",
       ),
     );
   }
@@ -282,7 +287,7 @@ export class ReactQueryGenerator implements OpenApiGenerator {
           t.expressionStatement(
             t.assignmentExpression(
               "=",
-              t.memberExpression(t.identifier("this"), t.privateName(t.identifier("api"))),
+              t.memberExpression(t.thisExpression(), t.privateName(t.identifier("api"))),
               t.identifier("api"),
             ),
           ),

@@ -513,7 +513,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       const trySuffixes = ["", ...(ctx.base ? ["_Base"] : [])];
 
       if (!trySuffixes.some((suffix) => this.#schemas.has(schema.$ref + suffix))) {
-        const zodSchema = this.#getZodSchema(document, dereferenceSchema(document, schema), ctx);
+        const zodSchema = this.#getZodSchema(document, dereferenceSchema(schema), ctx);
         const suffix = zodSchema.meta?.discriminatedBase ? "_Base" : "";
         const identifier = t.identifier(schemaKey + suffix);
         if (this.#options.includeTypeAnnotations) {
@@ -604,7 +604,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
               allOf: [
                 {
                   $ref: discriminatedSchemaRef,
-                  "$ref-value": dereferenceSchema(document, discriminatedSchema),
+                  "$ref-value": dereferenceSchema(discriminatedSchema),
                 },
                 {
                   type: "object",
@@ -958,7 +958,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       ]),
     ]);
 
-    const schema = dereferenceSchema(document, content.schema);
+    const schema = dereferenceSchema(content.schema);
     if (!("type" in schema) || schema.type !== "object") {
       console.warn(`Unsupported multipart/form-data schema for operation ${operationKey}`);
       return null;
@@ -1223,6 +1223,11 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     const responseOptions = t.arrayExpression([]);
 
     for (const [status, responseRef] of Object.entries(ref.operation.responses ?? {})) {
+      if (!status.match(/^\d{3}$/)) {
+        console.warn(`Unsupported status code ${status} for operation ${operationKey}`);
+        continue;
+      }
+
       const response = dereference(responseRef);
       if (!response.content) {
         responseOptions.elements.push(

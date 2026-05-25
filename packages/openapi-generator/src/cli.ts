@@ -48,5 +48,5 @@ if (args.values.watch) {
       void scheduleGenerate();
   });
 } else {
-  void scheduleGenerate();
+  await scheduleGenerate();
 }

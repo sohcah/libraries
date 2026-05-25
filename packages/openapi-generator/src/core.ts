@@ -20,10 +20,7 @@ export type OperationReference = {
   operation: OperationObject;
 };
 
-export function dereferenceSchema(
-  document: ApiDocument,
-  schema: SchemaReferenceType,
-): SchemaObject {
+export function dereferenceSchema(schema: SchemaReferenceType): SchemaObject {
   if ("$ref-value" in schema) {
     return schema["$ref-value"] as SchemaObject;
   }

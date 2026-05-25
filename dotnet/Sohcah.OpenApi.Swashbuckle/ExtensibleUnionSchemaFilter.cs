@@ -7,6 +7,7 @@ public class ExtensibleUnionSchemaFilter : ISchemaFilter
 {
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
-        ((OpenApiSchema)schema).AddExtension("x-sohcah-extensible-union", new JsonNodeExtension(true));
+        if (schema is not OpenApiSchema directSchema) return;
+        directSchema.AddExtension("x-sohcah-extensible-union", new JsonNodeExtension(true));
     }
 }

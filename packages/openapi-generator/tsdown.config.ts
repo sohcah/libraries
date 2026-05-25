@@ -11,4 +11,6 @@ export default defineConfig({
     "./src/generate.ts",
   ],
   platform: "node",
+  sourcemap: true,
+  dts: true,
 });

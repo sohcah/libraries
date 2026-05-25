@@ -1,6 +1,6 @@
 import * as t from "@babel/types";
 
-export function stringLiteralOrIdentifier(value: string) {
+export function stringLiteralOrIdentifier(value: string): t.Identifier | t.StringLiteral {
   if (value.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
     return t.identifier(value);
   }

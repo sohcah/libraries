@@ -7,7 +7,7 @@ function createAppendStatementInternal(
   value: t.Expression,
   schemaRef: SchemaReferenceType,
 ): t.Statement | null {
-  const schema = dereferenceSchema(null!, schemaRef);
+  const schema = dereferenceSchema(schemaRef);
 
   if (schema.allOf?.length === 1) {
     return createAppendStatementInternal(appendTo, name, value, schema.allOf[0]!);

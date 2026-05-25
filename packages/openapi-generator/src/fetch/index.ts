@@ -11,12 +11,15 @@ import * as t from "@babel/types";
 import { writeFile } from "node:fs/promises";
 import { generate } from "@babel/generator";
 import { getOperationKey } from "../helpers.js";
-import { stringLiteralOrIdentifier } from "../js/stringLiteralOrIdentifier.js";
+import {
+  stringLiteralOrIdentifier,
+  stringMemberExpression,
+} from "../js/stringLiteralOrIdentifier.js";
 import {
   ensureImport,
   relativeImportPathFromDocument,
   type ImportExtensionsBehaviour,
-} from "../js/ensureImport.ts";
+} from "../js/ensureImport.js";
 
 interface FetchGeneratorOptionsBase {
   output: string;
@@ -91,7 +94,7 @@ export class FetchGenerator implements OpenApiJsRequestGenerator {
         t.expressionStatement(
           t.assignmentExpression(
             "=",
-            t.memberExpression(t.identifier("this"), t.privateName(t.identifier("fetch"))),
+            t.memberExpression(t.thisExpression(), t.privateName(t.identifier("fetch"))),
             t.identifier("fetch"),
           ),
         ),
@@ -225,9 +228,7 @@ export class FetchGenerator implements OpenApiJsRequestGenerator {
     ref: OperationReference,
   ) {
     const operationKey = getOperationKey(ref, "lower");
-    return t.callExpression(t.memberExpression(requester, t.identifier(operationKey)), [
-      parameters,
-    ]);
+    return t.callExpression(stringMemberExpression(requester, operationKey), [parameters]);
   }
 }
 
