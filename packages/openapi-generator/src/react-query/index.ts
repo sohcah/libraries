@@ -1,8 +1,9 @@
 import type { OpenApiConfig } from "../config.js";
 import {
+  JsRequestGeneratorExtension,
   JsSchemaGeneratorExtension,
   type JsDocument,
-  type OpenApiJsSchemaGenerator,
+  type OpenApiJsRequestGenerator,
 } from "../js/index.js";
 import type { OpenApiGenerator, ApiDocument, OperationReference } from "../core.js";
 import * as t from "@babel/types";
@@ -28,90 +29,16 @@ interface ReactQueryGeneratorOptionsBase {
 }
 
 interface ReactQueryGeneratorInternalOptions extends ReactQueryGeneratorOptionsBase {
-  schemaGenerator: OpenApiJsSchemaGenerator;
+  requestGenerator: OpenApiJsRequestGenerator;
 }
 
-interface ReactQueryGeneratorOptions<T extends string> extends ReactQueryGeneratorOptionsBase {
-  schemaGenerator: T;
+interface ReactQueryGeneratorOptions<
+  TRequest extends string,
+> extends ReactQueryGeneratorOptionsBase {
+  requestGenerator: TRequest;
 }
 
-function createQueryFn(doc: JsDocument, runtime: string): t.FunctionDeclaration {
-  ensureImport(doc.imports, "getApiResult", runtime);
-  ensureImport(doc.imports, "getUnexpectedResult", runtime);
-  const paramsParam = t.restElement(t.identifier("params"));
-  paramsParam.typeAnnotation = t.tsTypeAnnotation(t.tsTypeReference(t.identifier("P")));
-  const fnParam = t.identifier("fn");
-  fnParam.typeAnnotation = t.tsTypeAnnotation(
-    t.tsFunctionType(
-      null,
-      [paramsParam],
-      t.tsTypeAnnotation(
-        t.tsTypeReference(
-          t.identifier("Promise"),
-          t.tsTypeParameterInstantiation([t.tsTypeReference(t.identifier("T"))]),
-        ),
-      ),
-    ),
-  );
-  const fn = t.functionDeclaration(
-    t.identifier("queryFn"),
-    [fnParam],
-    t.blockStatement([
-      t.returnStatement(
-        t.arrowFunctionExpression(
-          [paramsParam],
-          t.blockStatement([
-            t.variableDeclaration("const", [
-              t.variableDeclarator(
-                t.identifier("result"),
-                t.awaitExpression(
-                  t.callExpression(
-                    t.memberExpression(
-                      t.callExpression(fnParam, [t.spreadElement(t.identifier("params"))]),
-                      t.identifier("then"),
-                    ),
-                    [t.identifier("getApiResult"), t.identifier("getUnexpectedResult")],
-                  ),
-                ),
-              ),
-            ]),
-            t.ifStatement(
-              t.binaryExpression(
-                "===",
-                t.memberExpression(t.identifier("result"), t.identifier("type")),
-                t.stringLiteral("success"),
-              ),
-              t.returnStatement(t.memberExpression(t.identifier("result"), t.identifier("data"))),
-            ),
-            t.throwStatement(t.memberExpression(t.identifier("result"), t.identifier("error"))),
-          ]),
-          true,
-        ),
-      ),
-    ]),
-  );
-  fn.typeParameters = t.tsTypeParameterDeclaration([
-    t.tsTypeParameter(
-      t.tsTypeLiteral([
-        t.tsPropertySignature(t.identifier("code"), t.tsTypeAnnotation(t.tsNumberKeyword())),
-        t.tsPropertySignature(t.identifier("contentType"), t.tsTypeAnnotation(t.tsStringKeyword())),
-        t.tsPropertySignature(t.identifier("response"), t.tsTypeAnnotation(t.tsUnknownKeyword())),
-      ]),
-      undefined,
-      "T",
-    ),
-    t.tsTypeParameter(t.tsArrayType(t.tsUnknownKeyword()), undefined, "P"),
-  ]);
-  return fn;
-}
-
-function createQueryResultType(
-  doc: JsDocument,
-  runtime: string,
-  type: "Success" | "Error",
-): t.TSTypeAliasDeclaration {
-  ensureImport(doc.imports, "getApiResult", runtime, true);
-  ensureImport(doc.imports, "getUnexpectedResult", runtime, true);
+function createQueryResultType(type: "Success" | "Error"): t.TSTypeAliasDeclaration {
   return t.tsTypeAliasDeclaration(
     t.identifier("Query" + type),
     t.tsTypeParameterDeclaration([
@@ -166,66 +93,7 @@ function createQueryResultType(
 
 export class ReactQueryGenerator implements OpenApiGenerator {
   #options: ReactQueryGeneratorInternalOptions;
-  #apiBody: t.ClassBody = t.classBody([
-    t.classPrivateProperty(t.privateName(t.identifier("fetch"))),
-    t.classMethod(
-      "constructor",
-      t.identifier("constructor"),
-      [
-        Object.assign(t.identifier("fetch"), {
-          typeAnnotation: t.tsTypeAnnotation(
-            t.tsFunctionType(
-              null,
-              [
-                Object.assign(t.identifier("path"), {
-                  typeAnnotation: t.tsTypeAnnotation(t.tsStringKeyword()),
-                }),
-                Object.assign(t.identifier("options"), {
-                  typeAnnotation: t.tsTypeAnnotation(
-                    t.tsTypeLiteral([
-                      t.tsPropertySignature(
-                        t.identifier("method"),
-                        t.tsTypeAnnotation(t.tsStringKeyword()),
-                      ),
-                      Object.assign(
-                        t.tsPropertySignature(
-                          t.identifier("headers"),
-                          t.tsTypeAnnotation(t.tsTypeReference(t.identifier("Headers"))),
-                        ),
-                        { optional: true },
-                      ),
-                      Object.assign(
-                        t.tsPropertySignature(
-                          t.identifier("body"),
-                          t.tsTypeAnnotation(t.tsTypeReference(t.identifier("BodyInit"))),
-                        ),
-                        { optional: true },
-                      ),
-                    ]),
-                  ),
-                }),
-              ],
-              t.tsTypeAnnotation(
-                t.tsTypeReference(
-                  t.identifier("Promise"),
-                  t.tsTypeParameterInstantiation([t.tsTypeReference(t.identifier("Response"))]),
-                ),
-              ),
-            ),
-          ),
-        }),
-      ],
-      t.blockStatement([
-        t.expressionStatement(
-          t.assignmentExpression(
-            "=",
-            t.memberExpression(t.identifier("this"), t.privateName(t.identifier("fetch"))),
-            t.identifier("fetch"),
-          ),
-        ),
-      ]),
-    ),
-  ]);
+  #apiBody: t.ClassBody;
 
   #doc: JsDocument;
 
@@ -236,37 +104,15 @@ export class ReactQueryGenerator implements OpenApiGenerator {
       imports: [],
       importExtensions: options.importExtensions ?? "retain",
     };
+    this.#apiBody = t.classBody([t.classPrivateProperty(t.privateName(t.identifier("api")))]);
   }
 
   async visitOperation(document: ApiDocument, ref: OperationReference): Promise<void> {
     const operationKey = getOperationKey(ref, "lower");
 
-    const fetchCall = t.awaitExpression(
-      t.callExpression(
-        t.memberExpression(t.thisExpression(), t.privateName(t.identifier("fetch"))),
-        [
-          t.memberExpression(t.identifier("params"), t.identifier("path")),
-          t.objectExpression([
-            t.objectProperty(
-              t.identifier("method"),
-              t.memberExpression(t.identifier("params"), t.identifier("method")),
-            ),
-            t.objectProperty(
-              t.identifier("headers"),
-              t.memberExpression(t.identifier("params"), t.identifier("headers")),
-            ),
-            t.objectProperty(
-              t.identifier("body"),
-              t.memberExpression(t.identifier("params"), t.identifier("body")),
-            ),
-          ]),
-        ],
-      ),
-    );
-
-    const parametersType = await this.#options.schemaGenerator[
-      JsSchemaGeneratorExtension
-    ].getParameterType(this.#doc, ref);
+    const parametersType = await this.#options.requestGenerator[
+      JsSchemaGeneratorExtension.getParameterType
+    ](this.#doc, ref);
     const parameters = t.identifier("parameters");
     parameters.typeAnnotation = t.tsTypeAnnotation(parametersType);
 
@@ -278,32 +124,34 @@ export class ReactQueryGenerator implements OpenApiGenerator {
         t.blockStatement([
           t.variableDeclaration("const", [
             t.variableDeclarator(
-              t.identifier("params"),
-              t.awaitExpression(
-                await this.#options.schemaGenerator[JsSchemaGeneratorExtension].encodeParameters(
-                  this.#doc,
-                  ref,
-                  t.identifier("parameters"),
-                ),
-              ),
-            ),
-          ]),
-          t.variableDeclaration("const", [
-            t.variableDeclarator(t.identifier("response"), fetchCall),
-          ]),
-          t.variableDeclaration("const", [
-            t.variableDeclarator(
               t.identifier("result"),
               t.awaitExpression(
-                await this.#options.schemaGenerator[JsSchemaGeneratorExtension].parseResponse(
-                  this.#doc,
-                  ref,
-                  t.identifier("response"),
+                t.callExpression(
+                  t.memberExpression(
+                    await this.#options.requestGenerator[
+                      JsRequestGeneratorExtension.getRequestCall
+                    ](
+                      this.#doc,
+                      t.memberExpression(t.thisExpression(), t.privateName(t.identifier("api"))),
+                      parameters,
+                      ref,
+                    ),
+                    t.identifier("then"),
+                  ),
+                  [t.identifier("getApiResult"), t.identifier("getUnexpectedResult")],
                 ),
               ),
             ),
           ]),
-          t.returnStatement(t.identifier("result")),
+          t.ifStatement(
+            t.binaryExpression(
+              "===",
+              t.memberExpression(t.identifier("result"), t.identifier("type")),
+              t.stringLiteral("success"),
+            ),
+            t.returnStatement(t.memberExpression(t.identifier("result"), t.identifier("data"))),
+          ),
+          t.throwStatement(t.memberExpression(t.identifier("result"), t.identifier("error"))),
         ]),
         false,
         false,
@@ -355,16 +203,16 @@ export class ReactQueryGenerator implements OpenApiGenerator {
           isMutation
             ? t.objectProperty(
                 t.identifier("mutationFn"),
-                t.callExpression(t.identifier("queryFn"), [
-                  t.arrowFunctionExpression(
+                // t.callExpression(t.identifier("queryFn"), [
+                t.arrowFunctionExpression(
+                  [parameters],
+                  t.callExpression(
+                    t.memberExpression(t.thisExpression(), t.identifier(operationKey)),
                     [parameters],
-                    t.callExpression(
-                      t.memberExpression(t.thisExpression(), t.identifier(operationKey)),
-                      [parameters],
-                    ),
-                    true,
                   ),
-                ]),
+                  true,
+                ),
+                // ]),
               )
             : t.objectProperty(
                 t.identifier("queryFn"),
@@ -375,25 +223,23 @@ export class ReactQueryGenerator implements OpenApiGenerator {
                     ensureImport(this.#doc.imports, "skipToken", "@tanstack/react-query"),
                   ),
                   ensureImport(this.#doc.imports, "skipToken", "@tanstack/react-query"),
-                  t.callExpression(t.identifier("queryFn"), [
-                    t.arrowFunctionExpression(
-                      [],
-                      t.awaitExpression(
-                        t.callExpression(
-                          t.memberExpression(t.thisExpression(), t.identifier(operationKey)),
-                          [parametersWithSkipToken],
-                        ),
+                  t.arrowFunctionExpression(
+                    [],
+                    t.awaitExpression(
+                      t.callExpression(
+                        t.memberExpression(t.thisExpression(), t.identifier(operationKey)),
+                        [parametersWithSkipToken],
                       ),
-                      true,
                     ),
-                  ]),
+                    true,
+                  ),
                 ),
               ),
         ]),
       ],
     );
     const responseType = t.tsTypeParameterInstantiation([
-      await this.#options.schemaGenerator[JsSchemaGeneratorExtension].getResponseType(
+      await this.#options.requestGenerator[JsSchemaGeneratorExtension.getResponseType](
         this.#doc,
         ref,
       ),
@@ -419,13 +265,38 @@ export class ReactQueryGenerator implements OpenApiGenerator {
   }
 
   async complete(): Promise<void> {
+    this.#apiBody.body.unshift(
+      t.classMethod(
+        "constructor",
+        t.identifier("constructor"),
+        [
+          Object.assign(t.identifier("api"), {
+            typeAnnotation: t.tsTypeAnnotation(
+              await this.#options.requestGenerator[JsRequestGeneratorExtension.getRequesterType](
+                this.#doc,
+              ),
+            ),
+          }),
+        ],
+        t.blockStatement([
+          t.expressionStatement(
+            t.assignmentExpression(
+              "=",
+              t.memberExpression(t.identifier("this"), t.privateName(t.identifier("api"))),
+              t.identifier("api"),
+            ),
+          ),
+        ]),
+      ),
+    );
+
     const runtime = this.#options.runtime ?? DEFAULT_RUNTIME;
-    const queryFn = createQueryFn(this.#doc, runtime);
-    const queryResultTypeSuccess = createQueryResultType(this.#doc, runtime, "Success");
-    const queryResultTypeError = createQueryResultType(this.#doc, runtime, "Error");
+    ensureImport(this.#doc.imports, "getApiResult", runtime);
+    ensureImport(this.#doc.imports, "getUnexpectedResult", runtime);
+    const queryResultTypeSuccess = createQueryResultType("Success");
+    const queryResultTypeError = createQueryResultType("Error");
     const program = t.program([
       ...this.#doc.imports,
-      queryFn,
       queryResultTypeSuccess,
       queryResultTypeError,
       t.exportNamedDeclaration(t.classDeclaration(t.identifier("Api"), null, this.#apiBody)),
@@ -434,12 +305,12 @@ export class ReactQueryGenerator implements OpenApiGenerator {
   }
 }
 
-export function createReactQueryGenerator<const T extends string>(
-  options: ReactQueryGeneratorOptions<T>,
+export function createReactQueryGenerator<const TRequest extends string>(
+  options: ReactQueryGeneratorOptions<TRequest>,
 ) {
-  return (config: OpenApiConfig<{ [value in T]: OpenApiJsSchemaGenerator }>) =>
+  return (config: OpenApiConfig<{ [value in TRequest]: OpenApiJsRequestGenerator }>) =>
     new ReactQueryGenerator({
       ...options,
-      schemaGenerator: config.builders[options.schemaGenerator],
+      requestGenerator: config.builders[options.requestGenerator],
     });
 }

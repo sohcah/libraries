@@ -1,5 +1,9 @@
 import { writeFile } from "node:fs/promises";
-import { JsSchemaGeneratorExtension, type OpenApiJsSchemaGenerator } from "../js/index.js";
+import {
+  JsSchemaGeneratorExtension,
+  type JsDocument,
+  type OpenApiJsSchemaGenerator,
+} from "../js/index.js";
 import {
   type OpenApiGenerator,
   type ApiDocument,
@@ -1310,81 +1314,89 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     await writeFile(this.#options.output, generate(program).code);
   }
 
-  [JsSchemaGeneratorExtension]: OpenApiJsSchemaGenerator[typeof JsSchemaGeneratorExtension] = {
-    getParameterType: async (doc, ref) => {
-      ensureImport(doc.imports, "z", "zod");
-      const schemaName = `${getOperationKey(ref)}_Parameters`;
-      ensureImport(
-        doc.imports,
-        schemaName,
-        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
-      );
-      return this.#zResolvedType("output", t.tsTypeQuery(t.identifier(schemaName)));
-    },
-    encodeParameters: async (doc, ref, parameters) => {
-      ensureImport(doc.imports, "z", "zod");
-      const schemaName = `${getOperationKey(ref)}_Parameters`;
-      ensureImport(
-        doc.imports,
-        schemaName,
-        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
-      );
-      return this.#z("encodeAsync", [t.identifier(schemaName), parameters]);
-    },
-    getResponseType: async (doc, ref) => {
-      ensureImport(doc.imports, "z", "zod");
-      const schemaName = `${getOperationKey(ref)}_Response`;
-      ensureImport(
-        doc.imports,
-        schemaName,
-        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
-      );
-      return this.#zResolvedType("output", t.tsTypeQuery(t.identifier(schemaName)));
-    },
-    parseResponse: async (doc, ref, response) => {
-      ensureImport(doc.imports, "z", "zod");
-      const schemaName = `${getOperationKey(ref)}_Response`;
-      ensureImport(
-        doc.imports,
-        schemaName,
-        relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
-      );
-      return this.#z("parseAsync", [
-        t.identifier(schemaName),
-        t.objectExpression([
-          t.objectProperty(
-            t.identifier("code"),
-            t.memberExpression(response, t.identifier("status")),
-          ),
-          t.objectProperty(
-            t.identifier("contentType"),
-            t.optionalMemberExpression(
-              t.optionalCallExpression(
-                t.optionalMemberExpression(
-                  t.callExpression(
-                    t.memberExpression(
-                      t.memberExpression(response, t.identifier("headers")),
-                      t.identifier("get"),
-                    ),
-                    [t.stringLiteral("Content-Type")],
+  async [JsSchemaGeneratorExtension.getParameterType](doc: JsDocument, ref: OperationReference) {
+    ensureImport(doc.imports, "z", "zod", true);
+    const schemaName = `${getOperationKey(ref)}_Parameters`;
+    ensureImport(
+      doc.imports,
+      schemaName,
+      relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+      true,
+    );
+    return this.#zResolvedType("output", t.tsTypeQuery(t.identifier(schemaName)));
+  }
+  async [JsSchemaGeneratorExtension.encodeParameters](
+    doc: JsDocument,
+    ref: OperationReference,
+    parameters: t.Expression,
+  ) {
+    ensureImport(doc.imports, "z", "zod");
+    const schemaName = `${getOperationKey(ref)}_Parameters`;
+    ensureImport(
+      doc.imports,
+      schemaName,
+      relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+    );
+    return this.#z("encodeAsync", [t.identifier(schemaName), parameters]);
+  }
+  async [JsSchemaGeneratorExtension.getResponseType](doc: JsDocument, ref: OperationReference) {
+    ensureImport(doc.imports, "z", "zod", true);
+    const schemaName = `${getOperationKey(ref)}_Response`;
+    ensureImport(
+      doc.imports,
+      schemaName,
+      relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+      true,
+    );
+    return this.#zResolvedType("output", t.tsTypeQuery(t.identifier(schemaName)));
+  }
+  async [JsSchemaGeneratorExtension.parseResponse](
+    doc: JsDocument,
+    ref: OperationReference,
+    response: t.Expression,
+  ) {
+    ensureImport(doc.imports, "z", "zod");
+    const schemaName = `${getOperationKey(ref)}_Response`;
+    ensureImport(
+      doc.imports,
+      schemaName,
+      relativeImportPath(doc.path, this.#options.output, doc.importExtensions),
+    );
+    return this.#z("parseAsync", [
+      t.identifier(schemaName),
+      t.objectExpression([
+        t.objectProperty(
+          t.identifier("code"),
+          t.memberExpression(response, t.identifier("status")),
+        ),
+        t.objectProperty(
+          t.identifier("contentType"),
+          t.optionalMemberExpression(
+            t.optionalCallExpression(
+              t.optionalMemberExpression(
+                t.callExpression(
+                  t.memberExpression(
+                    t.memberExpression(response, t.identifier("headers")),
+                    t.identifier("get"),
                   ),
-                  t.identifier("split"),
-                  false,
-                  true,
+                  [t.stringLiteral("Content-Type")],
                 ),
-                [t.stringLiteral(";")],
+                t.identifier("split"),
                 false,
+                true,
               ),
-              t.numericLiteral(0),
-              true,
-              true,
+              [t.stringLiteral(";")],
+              false,
             ),
+            t.numericLiteral(0),
+            true,
+            true,
           ),
-          t.objectProperty(t.identifier("response"), response),
-        ]),
-      ]);
-    },
-  };
+        ),
+        t.objectProperty(t.identifier("response"), response),
+      ]),
+    ]);
+  }
 }
 
 export function createZodGenerator(options: ZodGeneratorOptions) {

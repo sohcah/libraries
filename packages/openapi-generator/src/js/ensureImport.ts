@@ -1,5 +1,6 @@
 import * as t from "@babel/types";
 import { relative, dirname } from "node:path/posix";
+import type { JsDocument } from "./index.ts";
 
 export function ensureImport(
   imports: t.ImportDeclaration[],
@@ -9,40 +10,35 @@ export function ensureImport(
 ) {
   const identifier = t.identifier(name);
 
-  let existingImport = imports.find((i) => i.source.value === from);
-  if (!existingImport) {
-    existingImport = t.importDeclaration([], t.stringLiteral(from));
-    imports.push(existingImport);
-  }
-  if (
-    !existingImport.specifiers.find((s) => s.type === "ImportSpecifier" && s.local.name === name)
-  ) {
-    const specifier = t.importSpecifier(identifier, identifier);
-    if (typeOnly) specifier.importKind = "type";
-    existingImport.specifiers.push(specifier);
+  let importDeclaration = imports.find((i) => i.source.value === from);
+  if (!importDeclaration) {
+    importDeclaration = t.importDeclaration([], t.stringLiteral(from));
+    importDeclaration.importKind = typeOnly ? "type" : "value";
+    imports.push(importDeclaration);
   }
 
-  return identifier;
-}
-
-export function ensureNamespaceImport(imports: t.ImportDeclaration[], name: string, from: string) {
-  const identifier = t.identifier(name);
-
-  const existingImport = imports.find((i) => i.source.value === from);
-  if (existingImport) {
-    if (
-      !existingImport.specifiers.find(
-        (s) => s.type === "ImportNamespaceSpecifier" && s.local.name === name,
-      )
-    ) {
-      existingImport.specifiers.push(t.importNamespaceSpecifier(identifier));
+  if (!typeOnly && importDeclaration.importKind === "type") {
+    importDeclaration.importKind = "value";
+    for (const specific of importDeclaration.specifiers) {
+      if (specific.type === "ImportSpecifier") {
+        specific.importKind = "type";
+      }
     }
-    return identifier;
   }
 
-  imports.push(
-    t.importDeclaration([t.importNamespaceSpecifier(identifier)], t.stringLiteral(from)),
-  );
+  let importSpecifier = importDeclaration.specifiers.find(
+    (s) => s.type === "ImportSpecifier" && s.local.name === name,
+  ) as t.ImportSpecifier | undefined;
+  if (!importSpecifier) {
+    importSpecifier = t.importSpecifier(identifier, identifier);
+    importSpecifier.importKind = importDeclaration.importKind === "type" ? "value" : "type";
+    importDeclaration.specifiers.push(importSpecifier);
+  }
+
+  if (!typeOnly && importSpecifier.importKind === "type") {
+    importSpecifier.importKind = "value";
+  }
+
   return identifier;
 }
 
@@ -62,4 +58,8 @@ export function relativeImportPath(
     return path.replace(/\.[^\.]+$/, ".js");
   }
   return path;
+}
+
+export function relativeImportPathFromDocument(from: JsDocument, to: JsDocument) {
+  return relativeImportPath(from.path, to.path, from.importExtensions);
 }

@@ -24,6 +24,10 @@
       "default": "./dist/js/index.mjs",
       "types": "./dist/js/index.d.mts"
     },
+    "./fetch": {
+      "default": "./dist/fetch/index.mjs",
+      "types": "./dist/fetch/index.d.mts"
+    },
     "./generate": {
       "default": "./dist/generate.mjs",
       "types": "./dist/generate.d.mts"
