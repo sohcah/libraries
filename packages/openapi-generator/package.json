@@ -59,9 +59,7 @@
     "format": "oxfmt",
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "test": "vitest --run",
-    "cli": "./dist/cli.mjs",
-    "sample": "yarn build && yarn cli generate -c ./sample/openapi.config.ts && SCHEMA_FORMAT=effect yarn cli generate -c ./sample/openapi.config.ts && SCHEMA_FORMAT=zod-mini yarn cli generate -c ./sample/openapi.config.ts"
+    "test": "vitest --run"
   },
   "dependencies": {
     "@babel/generator": "^7.28.6",
