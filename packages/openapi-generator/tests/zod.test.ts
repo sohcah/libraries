@@ -1006,7 +1006,7 @@ describe("operations", () => {
     });
   });
 
-  test("operation without any responses still emits a discriminated union shell", async () => {
+  test("operation without any responses falls back to a blob-with-any-code schema", async () => {
     await snapshotZod("op-no-responses", {
       paths: {
         "/ping": { get: { operationId: "ping" } },

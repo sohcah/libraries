@@ -1,4 +1,4 @@
-// Test: operations > operation without any responses still emits a discriminated union shell
+// Test: operations > operation without any responses falls back to a blob-with-any-code schema
 //
 // Spec:
 // paths:
@@ -16,6 +16,12 @@ const ParametersSchema = z.object({
 const notImplemented = () => {
   throw new Error("Not implemented");
 };
+const blobResponseCodec = z.codec(z.instanceof(Response), z.instanceof(Blob), {
+  decode: async value => {
+    return await value.blob();
+  },
+  encode: notImplemented
+});
 export const Ping_Parameters = z.codec(ParametersSchema, z.object({}), {
   decode: notImplemented,
   encode: () => {
@@ -25,4 +31,8 @@ export const Ping_Parameters = z.codec(ParametersSchema, z.object({}), {
     };
   }
 });
-export const Ping_Response = z.discriminatedUnion("code", []);
+export const Ping_Response = z.object({
+  code: z.number(),
+  contentType: z.string().optional(),
+  response: blobResponseCodec
+});

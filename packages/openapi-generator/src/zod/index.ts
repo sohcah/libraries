@@ -1230,6 +1230,19 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     );
   }
 
+  #blobFallbackResponse(code: t.Expression): t.Expression {
+    return this.#z("object", [
+      t.objectExpression([
+        t.objectProperty(t.identifier("code"), code),
+        t.objectProperty(
+          t.identifier("contentType"),
+          this.#z("optional", [this.#z("string", [])], true),
+        ),
+        t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
+      ]),
+    ]);
+  }
+
   async #addOperationResponse(document: ApiDocument, ref: OperationReference): Promise<void> {
     const operationKey = getOperationKey(ref);
     const safeOperationKey = getIdentifierSafeOperationKey(ref);
@@ -1245,19 +1258,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       const response = dereference(responseRef);
 
       const noContentResponse = () =>
-        this.#z("object", [
-          t.objectExpression([
-            t.objectProperty(
-              t.identifier("code"),
-              this.#z("literal", [t.numericLiteral(Number(status))]),
-            ),
-            t.objectProperty(
-              t.identifier("contentType"),
-              this.#z("optional", [this.#z("string", [])], true),
-            ),
-            t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
-          ]),
-        ]);
+        this.#blobFallbackResponse(this.#z("literal", [t.numericLiteral(Number(status))]));
 
       if (!response.content) {
         responseOptions.elements.push(comment(response.description, noContentResponse()));
@@ -1311,13 +1312,20 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       }
     }
 
+    // When the operation declares no usable responses, fall back to the same
+    // blob-of-bytes shape we use for declared no-content responses but with
+    // `z.number()` for the code so any status is accepted. This keeps the
+    // emitted type usable (`{ code, contentType?, response }`) instead of the
+    // dead-end `z.never()` that `z.discriminatedUnion` would require.
+    const responseSchema =
+      responseOptions.elements.length === 0
+        ? this.#blobFallbackResponse(this.#z("number", []))
+        : this.#z("discriminatedUnion", [t.stringLiteral("code"), responseOptions]);
+
     this.#operations.push(
       t.exportNamedDeclaration(
         t.variableDeclaration("const", [
-          t.variableDeclarator(
-            t.identifier(`${safeOperationKey}_Response`),
-            this.#z("discriminatedUnion", [t.stringLiteral("code"), responseOptions]),
-          ),
+          t.variableDeclarator(t.identifier(`${safeOperationKey}_Response`), responseSchema),
         ]),
       ),
     );
