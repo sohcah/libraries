@@ -492,6 +492,26 @@ describe("operations", () => {
     });
   });
 
+  test("operation without operationId sanitizes invalid identifier characters in path", async () => {
+    await snapshotZod("op-no-operation-id-path-params", {
+      paths: {
+        "/users/{id}": {
+          get: {
+            parameters: [
+              { name: "id", in: "path", required: true, schema: { type: "string" } },
+            ],
+            responses: {
+              "200": {
+                description: "OK",
+                content: { "application/json": { schema: { type: "object" } } },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   test("204 no-content response", async () => {
     await snapshotZod("op-no-content", {
       paths: {

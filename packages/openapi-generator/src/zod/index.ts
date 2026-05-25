@@ -25,6 +25,10 @@ import {
 } from "../js/stringLiteralOrIdentifier.js";
 import { ensureImport, relativeImportPath } from "../js/ensureImport.js";
 
+function getIdentifierSafeOperationKey(ref: OperationReference): string {
+  return getOperationKey(ref).replace(/[^a-zA-Z0-9]/g, "__");
+}
+
 function comment<T extends t.Node>(comment: string | null | undefined, node: T) {
   if (!comment) return node;
   return t.addComment(node, "leading", comment);
@@ -1026,6 +1030,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     };
 
     const operationKey = getOperationKey(ref);
+    const safeOperationKey = getIdentifierSafeOperationKey(ref);
 
     const objectExpression = t.objectExpression([]);
     const pathParameters: Record<string, t.Expression> = {};
@@ -1200,7 +1205,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
         t.exportNamedDeclaration(
           t.variableDeclaration("const", [
             t.variableDeclarator(
-              t.identifier(`${operationKey}_Parameters`),
+              t.identifier(`${safeOperationKey}_Parameters`),
               this.#createCodec(
                 this.#ensureParametersSchema(),
                 this.#z("object", [objectExpression]),
@@ -1219,6 +1224,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
 
   async #addOperationResponse(document: ApiDocument, ref: OperationReference): Promise<void> {
     const operationKey = getOperationKey(ref);
+    const safeOperationKey = getIdentifierSafeOperationKey(ref);
 
     const responseOptions = t.arrayExpression([]);
 
@@ -1298,7 +1304,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       t.exportNamedDeclaration(
         t.variableDeclaration("const", [
           t.variableDeclarator(
-            t.identifier(`${operationKey}_Response`),
+            t.identifier(`${safeOperationKey}_Response`),
             this.#z("discriminatedUnion", [t.stringLiteral("code"), responseOptions]),
           ),
         ]),
@@ -1324,7 +1330,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
 
   async [JsSchemaGeneratorExtension.getParameterType](doc: JsDocument, ref: OperationReference) {
     ensureImport(doc.imports, "z", "zod", true);
-    const schemaName = `${getOperationKey(ref)}_Parameters`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Parameters`;
     ensureImport(
       doc.imports,
       schemaName,
@@ -1339,7 +1345,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     parameters: t.Expression,
   ) {
     ensureImport(doc.imports, "z", "zod");
-    const schemaName = `${getOperationKey(ref)}_Parameters`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Parameters`;
     ensureImport(
       doc.imports,
       schemaName,
@@ -1349,7 +1355,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
   }
   async [JsSchemaGeneratorExtension.getResponseType](doc: JsDocument, ref: OperationReference) {
     ensureImport(doc.imports, "z", "zod", true);
-    const schemaName = `${getOperationKey(ref)}_Response`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Response`;
     ensureImport(
       doc.imports,
       schemaName,
@@ -1364,7 +1370,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     response: t.Expression,
   ) {
     ensureImport(doc.imports, "z", "zod");
-    const schemaName = `${getOperationKey(ref)}_Response`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Response`;
     ensureImport(
       doc.imports,
       schemaName,
