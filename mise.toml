@@ -1,3 +1,8 @@
 [tools]
 node = "24.4.1"
 "npm:corepack" = "latest"
+"dotnet:dotnet-outdated-tool" = "4.7.1"
+
+[settings]
+idiomatic_version_file_enable_tools = ["dotnet"]
+experimental = true
