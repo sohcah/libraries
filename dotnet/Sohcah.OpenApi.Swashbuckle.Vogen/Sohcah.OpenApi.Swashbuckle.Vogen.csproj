@@ -6,7 +6,15 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>Sohcah.OpenApi.Swashbuckle.Vogen</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Swashbuckle.AspNetCore filter that decorates Vogen value object schemas with an x-sohcah-brand-id extension for branded type generation.</Description>
+    <PackageTags>openapi;swagger;swashbuckle;aspnetcore;vogen;branded-types</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

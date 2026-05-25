@@ -3,6 +3,11 @@
   "version": "0.3.0",
   "license": "MIT",
   "author": "Sam Hindess <mail@sohcah.dev>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sohcah/libraries.git",
+    "directory": "packages/openapi-generator"
+  },
   "bin": "./dist/cli.mjs",
   "files": [
     "dist"
@@ -47,7 +52,8 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "format": "oxfmt",

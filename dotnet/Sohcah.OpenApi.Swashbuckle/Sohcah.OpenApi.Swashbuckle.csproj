@@ -6,6 +6,17 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>Sohcah.OpenApi.Swashbuckle</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Swashbuckle.AspNetCore extensions for OpenAPI generation, including an ExtensibleUnion schema filter.</Description>
+    <PackageTags>openapi;swagger;swashbuckle;aspnetcore</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" PrivateAssets="all" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
