@@ -1239,7 +1239,10 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
                   t.identifier("code"),
                   this.#z("literal", [t.numericLiteral(Number(status))]),
                 ),
-                t.objectProperty(t.identifier("contentType"), this.#z("string", [])),
+                t.objectProperty(
+                  t.identifier("contentType"),
+                  this.#z("optional", [this.#z("string", [])], true),
+                ),
                 t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
               ]),
             ]),

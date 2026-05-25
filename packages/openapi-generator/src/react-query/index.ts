@@ -48,9 +48,12 @@ function createQueryResultType(type: "Success" | "Error"): t.TSTypeAliasDeclarat
       t.tsTypeParameter(
         t.tsTypeLiteral([
           t.tsPropertySignature(t.identifier("code"), t.tsTypeAnnotation(t.tsNumberKeyword())),
-          t.tsPropertySignature(
-            t.identifier("contentType"),
-            t.tsTypeAnnotation(t.tsStringKeyword()),
+          Object.assign(
+            t.tsPropertySignature(
+              t.identifier("contentType"),
+              t.tsTypeAnnotation(t.tsStringKeyword()),
+            ),
+            { optional: true },
           ),
           t.tsPropertySignature(t.identifier("response"), t.tsTypeAnnotation(t.tsUnknownKeyword())),
         ]),
