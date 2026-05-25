@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test } from "vitest";
 import { matchSnapshot, runReactQuery, type SpecInput } from "./helpers.ts";
 
 async function snapshotReactQuery(
@@ -131,28 +131,26 @@ describe("invalidator", () => {
 });
 
 describe("infinite queries", () => {
-  test("basic infinite query coexists alongside the regular query", async () => {
-    await snapshotReactQuery(
-      "infinite-basic",
-      {
-        paths: {
-          "/users": {
-            get: {
-              operationId: "listUsers",
-              parameters: [{ name: "cursor", in: "query", schema: { type: "string" } }],
-              responses: {
-                "200": {
-                  description: "OK",
-                  content: {
-                    "application/json": {
-                      schema: {
-                        type: "object",
-                        properties: {
-                          items: { type: "array", items: { type: "object" } },
-                          nextCursor: { type: "string" },
-                        },
-                        required: ["items"],
+  test('"infinite-query" tag emits an infinite-query method alongside the regular query', async () => {
+    await snapshotReactQuery("infinite-basic", {
+      paths: {
+        "/users": {
+          get: {
+            operationId: "listUsers",
+            tags: ["infinite-query"],
+            parameters: [{ name: "cursor", in: "query", schema: { type: "string" } }],
+            responses: {
+              "200": {
+                description: "OK",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        items: { type: "array", items: { type: "object" } },
+                        nextCursor: { type: "string" },
                       },
+                      required: ["items"],
                     },
                   },
                 },
@@ -161,53 +159,31 @@ describe("infinite queries", () => {
           },
         },
       },
-      { infiniteQueries: ["listUsers"] },
-    );
+    });
   });
 
-  test("infiniteQueries throws on unknown operation", async () => {
-    await expect(
-      runReactQuery(
-        {
-          paths: { "/users": { get: { operationId: "listUsers", responses: jsonOk } } },
-        },
-        { infiniteQueries: ["doesNotExist"] },
-      ),
-    ).rejects.toThrow(/infiniteQueries references unknown operation: "doesNotExist"/);
-  });
-
-  test("infiniteQueries throw lists all unknown operations with a plural suffix", async () => {
-    await expect(
-      runReactQuery(
-        {
-          paths: { "/users": { get: { operationId: "listUsers", responses: jsonOk } } },
-        },
-        { infiniteQueries: ["doesNotExist", "alsoMissing"] },
-      ),
-    ).rejects.toThrow(
-      /infiniteQueries references unknown operations: "doesNotExist", "alsoMissing"/,
-    );
-  });
-
-  test("infiniteQueries throws on mutation operation", async () => {
-    await expect(
-      runReactQuery(
-        {
-          paths: {
-            "/users": {
-              post: {
-                operationId: "createUser",
-                requestBody: {
-                  content: { "application/json": { schema: { type: "object" } } },
+  test('"infinite-query" tag also flips a mutation-style method into a query', async () => {
+    await snapshotReactQuery("infinite-post-tagged", {
+      paths: {
+        "/search": {
+          post: {
+            operationId: "search",
+            tags: ["infinite-query"],
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { cursor: { type: "string" } },
+                  },
                 },
-                responses: jsonCreated,
               },
             },
+            responses: jsonOk,
           },
         },
-        { infiniteQueries: ["createUser"] },
-      ),
-    ).rejects.toThrow(/Operation "createUser" is listed in infiniteQueries but is a mutation/);
+      },
+    });
   });
 });
 

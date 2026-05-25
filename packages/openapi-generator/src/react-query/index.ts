@@ -29,11 +29,13 @@ interface ReactQueryGeneratorOptionsBase {
    * @default "@sohcah/openapi-generator/react-query/std-runtime"
    */
   runtime?: string;
+}
 
-  /**
-   * A list of operation keys that should be treated as infinite queries.
-   */
-  infiniteQueries?: string[];
+const QUERY_TAGS = ["query", "infinite-query"] as const;
+const INFINITE_QUERY_TAG = "infinite-query";
+
+function hasTag(operation: OperationReference["operation"], tag: string): boolean {
+  return operation.tags?.some((i) => i.toLowerCase() === tag) ?? false;
 }
 
 interface ReactQueryGeneratorInternalOptions extends ReactQueryGeneratorOptionsBase {
@@ -109,9 +111,6 @@ export class ReactQueryGenerator implements OpenApiGenerator {
 
   #doc: JsDocument;
 
-  #infiniteQueriesConfig: Set<string>;
-  #infiniteQueriesMatched: Set<string>;
-
   constructor(options: ReactQueryGeneratorInternalOptions) {
     this.#options = options;
     this.#doc = {
@@ -125,9 +124,6 @@ export class ReactQueryGenerator implements OpenApiGenerator {
     ]);
 
     this.#apiInvalidatorBody = this.#createInitialApiInvalidatorBody();
-
-    this.#infiniteQueriesConfig = new Set(options.infiniteQueries ?? []);
-    this.#infiniteQueriesMatched = new Set();
   }
 
   #queryClientTypeReference(): t.TSTypeReference {
@@ -219,7 +215,9 @@ export class ReactQueryGenerator implements OpenApiGenerator {
       ref.methodKey !== "get" &&
       ref.methodKey !== "head" &&
       ref.methodKey !== "options" &&
-      !ref.operation.tags?.some((i) => i.toLowerCase() === "query");
+      !QUERY_TAGS.some((tag) => hasTag(ref.operation, tag));
+
+    const isInfiniteQuery = hasTag(ref.operation, INFINITE_QUERY_TAG);
 
     const parametersWithSkipToken = t.identifier("parameters");
     parametersWithSkipToken.typeAnnotation = t.tsTypeAnnotation(
@@ -326,15 +324,7 @@ export class ReactQueryGenerator implements OpenApiGenerator {
       );
     }
 
-    if (this.#infiniteQueriesConfig.has(operationKey)) {
-      if (isMutation) {
-        throw new Error(
-          `Operation "${operationKey}" is listed in infiniteQueries but is a mutation. ` +
-            `Only query operations (GET/HEAD/OPTIONS, or operations tagged "query") can be infinite queries.`,
-        );
-      }
-      this.#infiniteQueriesMatched.add(operationKey);
-
+    if (isInfiniteQuery) {
       const responseType = await this.#options.requestGenerator[
         JsSchemaGeneratorExtension.getResponseType
       ](this.#doc, ref);
@@ -517,15 +507,6 @@ export class ReactQueryGenerator implements OpenApiGenerator {
   }
 
   async complete(): Promise<void> {
-    const unknownInfiniteQueries = [...this.#infiniteQueriesConfig].filter(
-      (name) => !this.#infiniteQueriesMatched.has(name),
-    );
-    if (unknownInfiniteQueries.length > 0) {
-      throw new Error(
-        `infiniteQueries references unknown operation${unknownInfiniteQueries.length === 1 ? "" : "s"}: ${unknownInfiniteQueries.map((n) => JSON.stringify(n)).join(", ")}`,
-      );
-    }
-
     this.#apiBody.body.unshift(
       t.classMethod(
         "constructor",

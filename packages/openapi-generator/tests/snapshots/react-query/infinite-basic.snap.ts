@@ -1,10 +1,12 @@
-// Test: infinite queries > basic infinite query coexists alongside the regular query
+// Test: infinite queries > "infinite-query" tag emits an infinite-query method alongside the regular query
 //
 // Spec:
 // paths:
 //   /users:
 //     get:
 //       operationId: listUsers
+//       tags:
+//         - infinite-query
 //       parameters:
 //         - name: cursor
 //           in: query
