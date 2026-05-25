@@ -29,6 +29,11 @@ interface ReactQueryGeneratorOptionsBase {
    * @default "@sohcah/openapi-generator/react-query/std-runtime"
    */
   runtime?: string;
+
+  /**
+   * A list of operation keys that should be treated as infinite queries.
+   */
+  infiniteQueries?: string[];
 }
 
 interface ReactQueryGeneratorInternalOptions extends ReactQueryGeneratorOptionsBase {
@@ -104,6 +109,9 @@ export class ReactQueryGenerator implements OpenApiGenerator {
 
   #doc: JsDocument;
 
+  #infiniteQueriesConfig: Set<string>;
+  #infiniteQueriesMatched: Set<string>;
+
   constructor(options: ReactQueryGeneratorInternalOptions) {
     this.#options = options;
     this.#doc = {
@@ -117,6 +125,9 @@ export class ReactQueryGenerator implements OpenApiGenerator {
     ]);
 
     this.#apiInvalidatorBody = this.#createInitialApiInvalidatorBody();
+
+    this.#infiniteQueriesConfig = new Set(options.infiniteQueries ?? []);
+    this.#infiniteQueriesMatched = new Set();
   }
 
   #queryClientTypeReference(): t.TSTypeReference {
@@ -314,9 +325,207 @@ export class ReactQueryGenerator implements OpenApiGenerator {
         this.#buildInvalidatorMethod(operationKey, first(operationKey, "upper"), parametersType),
       );
     }
+
+    if (this.#infiniteQueriesConfig.has(operationKey)) {
+      if (isMutation) {
+        throw new Error(
+          `Operation "${operationKey}" is listed in infiniteQueries but is a mutation. ` +
+            `Only query operations (GET/HEAD/OPTIONS, or operations tagged "query") can be infinite queries.`,
+        );
+      }
+      this.#infiniteQueriesMatched.add(operationKey);
+
+      const responseType = await this.#options.requestGenerator[
+        JsSchemaGeneratorExtension.getResponseType
+      ](this.#doc, ref);
+
+      this.#apiBody.body.push(
+        this.#buildInfiniteQueryMethod(operationKey, parametersType, responseType),
+      );
+    }
+  }
+
+  #buildInfiniteQueryMethod(
+    operationKey: string,
+    parametersType: t.TSType,
+    responseType: t.TSType,
+  ): t.ClassMethod {
+    const queryKeyName = first(operationKey, "upper");
+
+    const tPageParam = t.tsTypeReference(t.identifier("TPageParam"));
+
+    const skipTokenTypeRef = () =>
+      t.tsTypeReference(
+        ensureImport(this.#doc.imports, "SkipToken", "@tanstack/react-query", true),
+      );
+
+    const querySuccessType = t.tsTypeReference(
+      t.identifier("QuerySuccess"),
+      t.tsTypeParameterInstantiation([responseType]),
+    );
+
+    // ((pageParam: TPageParam) => Parameters_ListUsers) | SkipToken
+    const getParametersType = t.tsUnionType([
+      t.tsParenthesizedType(
+        t.tsFunctionType(
+          null,
+          [
+            Object.assign(t.identifier("pageParam"), {
+              typeAnnotation: t.tsTypeAnnotation(tPageParam),
+            }),
+          ],
+          t.tsTypeAnnotation(parametersType),
+        ),
+      ),
+      skipTokenTypeRef(),
+    ]);
+
+    // (lastPage, allPages, lastPageParam, allPageParams) => TPageParam | undefined | null
+    const pageParamFnType = (pageParamName: string, allPageParamsName: string): t.TSFunctionType =>
+      t.tsFunctionType(
+        null,
+        [
+          Object.assign(t.identifier(pageParamName), {
+            typeAnnotation: t.tsTypeAnnotation(querySuccessType),
+          }),
+          Object.assign(t.identifier("allPages"), {
+            typeAnnotation: t.tsTypeAnnotation(t.tsArrayType(querySuccessType)),
+          }),
+          Object.assign(t.identifier(`${pageParamName}Param`), {
+            typeAnnotation: t.tsTypeAnnotation(tPageParam),
+          }),
+          Object.assign(t.identifier(allPageParamsName), {
+            typeAnnotation: t.tsTypeAnnotation(t.tsArrayType(tPageParam)),
+          }),
+        ],
+        t.tsTypeAnnotation(t.tsUnionType([tPageParam, t.tsUndefinedKeyword(), t.tsNullKeyword()])),
+      );
+
+    const optionsTypeLiteral = t.tsTypeLiteral([
+      t.tsPropertySignature(t.identifier("getParameters"), t.tsTypeAnnotation(getParametersType)),
+      t.tsPropertySignature(t.identifier("initialPageParam"), t.tsTypeAnnotation(tPageParam)),
+      t.tsPropertySignature(
+        t.identifier("getNextPageParam"),
+        t.tsTypeAnnotation(pageParamFnType("lastPage", "allPageParams")),
+      ),
+      Object.assign(
+        t.tsPropertySignature(
+          t.identifier("getPreviousPageParam"),
+          t.tsTypeAnnotation(pageParamFnType("firstPage", "allPageParams")),
+        ),
+        { optional: true },
+      ),
+      Object.assign(
+        t.tsPropertySignature(t.identifier("maxPages"), t.tsTypeAnnotation(t.tsNumberKeyword())),
+        { optional: true },
+      ),
+    ]);
+
+    const optionsParam = Object.assign(t.identifier("options"), {
+      typeAnnotation: t.tsTypeAnnotation(optionsTypeLiteral),
+    });
+
+    // const getParameters = options.getParameters;
+    const getParametersDecl = t.variableDeclaration("const", [
+      t.variableDeclarator(
+        t.identifier("getParameters"),
+        t.memberExpression(t.identifier("options"), t.identifier("getParameters")),
+      ),
+    ]);
+
+    const skipTokenIdent = () =>
+      ensureImport(this.#doc.imports, "skipToken", "@tanstack/react-query");
+
+    // getParameters === skipToken ? skipToken : getParameters(options.initialPageParam)
+    const initialPageParamsExpr = t.conditionalExpression(
+      t.binaryExpression("===", t.identifier("getParameters"), skipTokenIdent()),
+      skipTokenIdent(),
+      t.callExpression(t.identifier("getParameters"), [
+        t.memberExpression(t.identifier("options"), t.identifier("initialPageParam")),
+      ]),
+    );
+
+    // queryKey: ["ListUsers", <initialPageParamsExpr>, "infinite"] as QueryKey
+    const queryKeyExpr = t.tsAsExpression(
+      t.arrayExpression([
+        t.stringLiteral(queryKeyName),
+        initialPageParamsExpr,
+        t.stringLiteral("infinite"),
+      ]),
+      t.tsTypeReference(ensureImport(this.#doc.imports, "QueryKey", "@tanstack/react-query", true)),
+    );
+
+    // queryFn: getParameters === skipToken
+    //   ? skipToken
+    //   : async (ctx) => this.<operationKey>(getParameters(ctx.pageParam))
+    const queryFnExpr = t.conditionalExpression(
+      t.binaryExpression("===", t.identifier("getParameters"), skipTokenIdent()),
+      skipTokenIdent(),
+      t.arrowFunctionExpression(
+        [t.identifier("ctx")],
+        t.callExpression(stringMemberExpression(t.thisExpression(), operationKey), [
+          t.callExpression(t.identifier("getParameters"), [
+            t.tsAsExpression(
+              t.memberExpression(t.identifier("ctx"), t.identifier("pageParam")),
+              t.tsTypeReference(t.identifier("TPageParam")),
+            ),
+          ]),
+        ]),
+        true,
+      ),
+    );
+
+    const infiniteQueryOptionsCall = t.callExpression(
+      ensureImport(this.#doc.imports, "infiniteQueryOptions", "@tanstack/react-query"),
+      [
+        t.objectExpression([
+          t.objectProperty(t.identifier("queryKey"), queryKeyExpr),
+          t.objectProperty(t.identifier("queryFn"), queryFnExpr),
+          t.objectProperty(
+            t.identifier("initialPageParam"),
+            t.memberExpression(t.identifier("options"), t.identifier("initialPageParam")),
+          ),
+          t.objectProperty(
+            t.identifier("getNextPageParam"),
+            t.memberExpression(t.identifier("options"), t.identifier("getNextPageParam")),
+          ),
+          t.objectProperty(
+            t.identifier("getPreviousPageParam"),
+            t.memberExpression(t.identifier("options"), t.identifier("getPreviousPageParam")),
+          ),
+          t.objectProperty(
+            t.identifier("maxPages"),
+            t.memberExpression(t.identifier("options"), t.identifier("maxPages")),
+          ),
+        ]),
+      ],
+    );
+
+    const methodName = stringLiteralOrIdentifier(operationKey + "InfiniteQuery");
+
+    const method = t.classMethod(
+      "method",
+      methodName,
+      [optionsParam],
+      t.blockStatement([getParametersDecl, t.returnStatement(infiniteQueryOptionsCall)]),
+      methodName.type === "StringLiteral",
+    );
+    method.typeParameters = t.tsTypeParameterDeclaration([
+      t.tsTypeParameter(null, null, "TPageParam"),
+    ]);
+    return method;
   }
 
   async complete(): Promise<void> {
+    const unknownInfiniteQueries = [...this.#infiniteQueriesConfig].filter(
+      (name) => !this.#infiniteQueriesMatched.has(name),
+    );
+    if (unknownInfiniteQueries.length > 0) {
+      throw new Error(
+        `infiniteQueries references unknown operation${unknownInfiniteQueries.length === 1 ? "" : "s"}: ${unknownInfiniteQueries.map((n) => JSON.stringify(n)).join(", ")}`,
+      );
+    }
+
     this.#apiBody.body.unshift(
       t.classMethod(
         "constructor",
