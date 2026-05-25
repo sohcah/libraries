@@ -216,7 +216,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
                     [
                       t.objectExpression([
                         t.objectProperty(t.identifier("code"), t.stringLiteral("custom")),
-                        t.objectProperty(t.identifier("input"), t.identifier("error")),
+                        t.objectProperty(t.identifier("input"), t.identifier("response")),
                         t.objectProperty(
                           t.identifier("message"),
                           t.memberExpression(

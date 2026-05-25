@@ -42,8 +42,9 @@ export async function generate<Builders extends Record<string, OpenApiGenerator>
     }
   }
 
-  for (const schemaKey in document.components?.schemas) {
-    const schema = document.components.schemas[schemaKey];
+  const schemas = document.components?.schemas ?? {};
+  for (const schemaKey in schemas) {
+    const schema = schemas[schemaKey];
     if (!schema) continue;
     for (const builder of buildersList) {
       await builder.visitSchema?.(
