@@ -20,8 +20,11 @@ export class ApiError<
   }
 }
 
+type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type SuccessCode = `2${Digit}${Digit}` extends `${infer N extends number}` ? N : never;
+
 type ApiErrorType<T extends { code: number; contentType: string; response: unknown }> = T extends {
-  code: 200;
+  code: SuccessCode;
 }
   ? never
   : ApiError<T>;
@@ -31,16 +34,16 @@ export function getApiResult<T extends { code: number; contentType: string; resp
 ):
   | {
       type: "success";
-      data: Extract<T, { code: 200 }>["response"];
+      data: Extract<T, { code: SuccessCode }>["response"];
     }
   | {
       type: "error";
       error: ApiErrorType<T> & Error;
     } {
-  if (result.code === 200) {
+  if (result.code >= 200 && result.code < 300) {
     return {
       type: "success",
-      data: result.response,
+      data: result.response as Extract<T, { code: SuccessCode }>["response"],
     };
   }
   return {
