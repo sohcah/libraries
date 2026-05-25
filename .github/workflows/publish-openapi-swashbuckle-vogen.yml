@@ -1,0 +1,48 @@
+name: Publish Sohcah.OpenApi.Swashbuckle.Vogen
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-openapi-swashbuckle-vogen
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to NuGet
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_PATH: dotnet/Sohcah.OpenApi.Swashbuckle.Vogen/Sohcah.OpenApi.Swashbuckle.Vogen.csproj
+      PACKAGE_OUTPUT: ${{ github.workspace }}/artifacts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+          experimental: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore
+        run: dotnet restore "$PROJECT_PATH"
+
+      - name: Pack
+        run: dotnet pack "$PROJECT_PATH" --configuration Release --no-restore --output "$PACKAGE_OUTPUT"
+
+      - name: NuGet login (OIDC → temp API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: sohcah
+
+      - name: Push to NuGet
+        run: |
+          dotnet nuget push "$PACKAGE_OUTPUT/*.nupkg" \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

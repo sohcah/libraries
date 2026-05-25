@@ -138,3 +138,6 @@ dist
 .history
 
 .DS_Store
+
+bin
+obj

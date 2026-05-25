@@ -21,6 +21,9 @@
     "rootDir": ".",
     "sourceMap": true,
 
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
     /* AND if you're building for a library: */
     "declaration": true,
 

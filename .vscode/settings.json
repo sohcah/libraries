@@ -1,0 +1,7 @@
+{
+  "oxc.enable.oxfmt": true,
+  "oxc.enable": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  }
+}

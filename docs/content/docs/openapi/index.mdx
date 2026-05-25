@@ -20,29 +20,47 @@ npm install @tanstack/react-query zod
 
 ## Usage
 
+The generator uses a builder pattern. Each generator (referred to as a _builder_) is registered with a name, and downstream builders can reference upstream ones by that name. This allows the schema, request, and client layers to be composed independently.
+
 ```ts title="openapi.config.ts"
 import { defineConfig } from "@sohcah/openapi-generator/config";
-import {
-  createReactQueryClientGenerator,
-  createZodSchemaGenerator,
-} from "@sohcah/openapi-generator/generators";
+import { createZodGenerator } from "@sohcah/openapi-generator/zod";
+import { createFetchGenerator } from "@sohcah/openapi-generator/fetch";
+import { createReactQueryGenerator } from "@sohcah/openapi-generator/react-query";
 
 export default defineConfig({
   schema: "swagger.json",
-  output: "src/api.ts",
-  generators: [
-    createReactQueryClientGenerator({
-      schema: createZodSchemaGenerator({}),
+})
+  .addBuilder("schemas", () =>
+    createZodGenerator({
+      output: "src/api.schemas.ts",
     }),
-  ],
-});
+  )
+  .addBuilder("fetch", () =>
+    createFetchGenerator({
+      output: "src/api.fetch.ts",
+      schemaGenerator: "schemas",
+    }),
+  )
+  .addBuilder("api", () =>
+    createReactQueryGenerator({
+      output: "src/api.ts",
+      requestGenerator: "fetch",
+    }),
+  );
 ```
+
+This produces three generated files:
+
+- `src/api.schemas.ts` — Zod schemas for every operation's parameters and responses.
+- `src/api.fetch.ts` — a `FetchApi` class that wraps a `fetch`-compatible function and uses the generated schemas to encode parameters and parse responses.
+- `src/api.ts` — an `Api` class exposing TanStack Query–ready `queryOptions` / `mutationOptions` for every operation, backed by the `FetchApi` class.
 
 ```json title="package.json"
 {
   "scripts": {
-    "openapi-build": "openapi-generator build",
-    "openapi-dev": "openapi-generator watch"
+    "openapi-build": "openapi-generator --config openapi.config.ts",
+    "openapi-dev": "openapi-generator --config openapi.config.ts --watch"
   }
 }
 ```

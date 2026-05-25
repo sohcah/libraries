@@ -4,91 +4,44 @@ title: Transformations
 
 # Custom Transformations
 
-## Effect
+The Zod schema generator supports two ways of replacing the schema it would otherwise emit:
 
-### `date-time` String to `Temporal.Instant`
+- `overrideFormats` — a record keyed by OpenAPI `format` string. Use this to swap in a custom schema for every property with a given format (e.g. `date-time`, `uuid`).
+- `overrideSchema` — a function that receives the full schema object and returns an override (or `null` to fall through to the default behaviour). Use this when the decision depends on more than just `format`.
+
+Each override is an `import` describing a function that returns a Zod schema. The function is imported into the generated file and called at the override site.
+
+## `date-time` String to `Temporal.Instant`
 
 ```ts title="openapi.config.ts"
 import { defineConfig } from "@sohcah/openapi-generator/config";
-import {
-  createReactQueryClientGenerator,
-  createEffectSchemaGenerator,
-} from "@sohcah/openapi-generator/generators";
+import { createZodGenerator } from "@sohcah/openapi-generator/zod";
 
 export default defineConfig({
   schema: "swagger.json",
-  output: "src/api.ts",
-  generators: [
-    createReactQueryClientGenerator({
-      schema: createEffectSchemaGenerator({
-        custom(schema) {
-          if (schema.type === "string" && schema.format === "date-time") {
-            return {
-              type: "import",
-              name: "instant",
-              from: "./api.schemas.js",
-            };
-          }
-          return null;
-        },
-      }),
-    }),
-  ],
-});
-```
-
-```ts title="src/api.schemas.ts"
-import { Schema } from "effect";
-import { Temporal } from "@js-temporal/polyfill";
-
-export const instant = () => Schema.String.pipe(
-  Schema.transform(Schema.instanceOf(Temporal.Instant), {
-    strict: true,
-    decode: (str) => Temporal.Instant.from(str),
-    encode: (date) => date.toString(),
-  })
+}).addBuilder("schemas", () =>
+  createZodGenerator({
+    output: "src/api.schemas.ts",
+    overrideFormats: {
+      "date-time": {
+        type: "import",
+        name: "zInstant",
+        from: "./api.helpers.js",
+      },
+    },
+  }),
 );
 ```
 
-## Zod
-
-### `date-time` String to `Temporal.Instant`
-
-```ts title="openapi.config.ts"
-import { defineConfig } from "@sohcah/openapi-generator/config";
-import {
-  createReactQueryClientGenerator,
-  createZodSchemaGenerator,
-} from "@sohcah/openapi-generator/generators";
-
-export default defineConfig({
-  schema: "swagger.json",
-  output: "src/api.ts",
-  generators: [
-    createReactQueryClientGenerator({
-      schema: createZodSchemaGenerator({
-        custom(schema) {
-          if (schema.type === "string" && schema.format === "date-time") {
-            return {
-              type: "import",
-              name: "zInstant",
-              from: "./api.schemas.js",
-            };
-          }
-          return null;
-        },
-      }),
-    }),
-  ],
-});
-```
-
-```ts title="src/api.schemas.ts"
+```ts title="src/api.helpers.ts"
 import { z } from "zod";
 import { Temporal } from "@js-temporal/polyfill";
 
-export const zInstant = () => z.codec(z.string(), z.instanceOf(Temporal.Instant), {
-  decode: (str) => Temporal.Instant.from(str),
-  encode: (date) => date.toString(),
-});
+export const zInstant = () =>
+  z.codec(z.string(), z.instanceOf(Temporal.Instant), {
+    decode: (str) => Temporal.Instant.from(str),
+    encode: (date) => date.toString(),
+  });
 ```
+
+The `from` path is written into the generated file verbatim, so it should resolve from the location of the generator's `output` file (here, `src/api.schemas.ts` → `./api.helpers.js`).
