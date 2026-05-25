@@ -550,6 +550,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
           };
         }
       }
+      /* v8 ignore next -- defensive: the suffix loop above always finds the entry we just inserted. */
       throw new Error(`Schema ${schema.$ref} not found`);
     }
 
@@ -755,34 +756,27 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
         };
       }
 
+      const applyOverride = (override: ZodSchemaOverride): ZodSchema => {
+        ensureImport(this.#imports, override.name, override.from);
+        return {
+          schema: t.callExpression(t.identifier(override.name), []),
+          type: t.tsTypeReference(
+            t.identifier("ReturnType"),
+            t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(override.name))]),
+          ),
+        };
+      };
+
       if ("format" in schema && schema.format) {
         const formatOverride = this.#options.overrideFormats?.[schema.format];
         if (formatOverride) {
-          if (formatOverride.type === "import") {
-            ensureImport(this.#imports, formatOverride.name, formatOverride.from);
-            return {
-              schema: t.callExpression(t.identifier(formatOverride.name), []),
-              type: t.tsTypeReference(
-                t.identifier("ReturnType"),
-                t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(formatOverride.name))]),
-              ),
-            };
-          }
+          return applyOverride(formatOverride);
         }
       }
 
       const override = this.#options.overrideSchema?.(schema);
       if (override) {
-        if (override.type === "import") {
-          ensureImport(this.#imports, override.name, override.from);
-          return {
-            schema: t.callExpression(t.identifier(override.name), []),
-            type: t.tsTypeReference(
-              t.identifier("ReturnType"),
-              t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(override.name))]),
-            ),
-          };
-        }
+        return applyOverride(override);
       }
 
       if (schema.type === "string") {
@@ -818,10 +812,12 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       if (schema.type === "object") {
         return this.#getZodObjectSchema(document, schema, ctx);
       }
+      /* v8 ignore start -- schema.type is "array" at this point; satisfies-never is a purely TypeScript-level safety net. */
       if (schema.type === "array") {
         return this.#getZodArraySchema(document, schema, ctx);
       }
       schema.type satisfies never;
+      /* v8 ignore stop */
     }
 
     return {
@@ -1256,7 +1252,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       } else {
         const statusResponses = t.arrayExpression([]);
 
-        for (const entry of Map.groupBy(Object.entries(response.content ?? {}), (i) =>
+        for (const entry of Map.groupBy(Object.entries(response.content), (i) =>
           JSON.stringify(i[1]),
         ).values()) {
           const contentTypes = entry.map((i) => i[0]);
@@ -1316,9 +1312,9 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
   }
 
   async visitOperation(document: ApiDocument, ref: OperationReference): Promise<void> {
-    this.#addOperationParameters(document, ref);
+    await this.#addOperationParameters(document, ref);
 
-    this.#addOperationResponse(document, ref);
+    await this.#addOperationResponse(document, ref);
   }
 
   async complete(): Promise<void> {

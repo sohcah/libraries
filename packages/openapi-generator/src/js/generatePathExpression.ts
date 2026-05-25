@@ -28,6 +28,7 @@ export function generatePathExpression(
       quasis.push(t.templateElement({ raw: part, cooked: part }, false));
     } else {
       const paramExpression = pathParameters[part];
+      /* v8 ignore next 3 -- the split regex is built from the keys of `pathParameters`, so any odd-indexed `part` is guaranteed to be a key. */
       if (!paramExpression) {
         throw new Error(`Path parameter ${part} not found`);
       }

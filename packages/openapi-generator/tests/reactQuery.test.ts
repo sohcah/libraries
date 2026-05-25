@@ -176,6 +176,19 @@ describe("infinite queries", () => {
     ).rejects.toThrow(/infiniteQueries references unknown operation: "doesNotExist"/);
   });
 
+  test("infiniteQueries throw lists all unknown operations with a plural suffix", async () => {
+    await expect(
+      runReactQuery(
+        {
+          paths: { "/users": { get: { operationId: "listUsers", responses: jsonOk } } },
+        },
+        { infiniteQueries: ["doesNotExist", "alsoMissing"] },
+      ),
+    ).rejects.toThrow(
+      /infiniteQueries references unknown operations: "doesNotExist", "alsoMissing"/,
+    );
+  });
+
   test("infiniteQueries throws on mutation operation", async () => {
     await expect(
       runReactQuery(
