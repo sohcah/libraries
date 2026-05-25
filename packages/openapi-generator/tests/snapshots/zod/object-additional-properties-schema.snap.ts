@@ -14,7 +14,7 @@
 //         type: number
 
 import z from "zod";
-export const Thing = z.catchall(z.object({
+export const Thing = z.object({
   id: z.string()
-}), z.number());
+}).catchall(z.number());
 export type Thing = z.output<typeof Thing>;

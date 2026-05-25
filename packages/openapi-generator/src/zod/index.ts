@@ -458,7 +458,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       const keyParam = t.identifier("key");
       keyParam.typeAnnotation = t.tsTypeAnnotation(t.tsStringKeyword());
       return {
-        schema: this.#z("catchall", [this.#z("object", [object]), valueSchema.schema]),
+        schema: this.#z("catchall", [this.#z("object", [object]), valueSchema.schema], true),
         type: this.#zSchemaType(
           t.tsTypeLiteral([
             ...objectTypeInput.members,
