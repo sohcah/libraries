@@ -11,5 +11,5 @@
 //         - false
 
 import z from "zod";
-export const Thing = z.enum([1, 2, true, false]);
+export const Thing = z.literal([1, 2, true, false]);
 export type Thing = z.output<typeof Thing>;

@@ -716,8 +716,11 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
 
     if (schema.enum) {
       const literals = schema.enum.map(this.#literal);
+      // `z.enum` only accepts string/number entries; fall back to `z.literal`
+      // for enums that include boolean values.
+      const helper = literals.some((l) => t.isBooleanLiteral(l)) ? "literal" : "enum";
       return {
-        schema: this.#z("enum", [t.arrayExpression(literals)]),
+        schema: this.#z(helper, [t.arrayExpression(literals)]),
         type: this.#zSchemaType(t.tsUnionType(literals.map((l) => t.tsLiteralType(l)))),
       };
     }
