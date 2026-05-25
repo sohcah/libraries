@@ -1235,25 +1235,24 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       }
 
       const response = dereference(responseRef);
+
+      const noContentResponse = () =>
+        this.#z("object", [
+          t.objectExpression([
+            t.objectProperty(
+              t.identifier("code"),
+              this.#z("literal", [t.numericLiteral(Number(status))]),
+            ),
+            t.objectProperty(
+              t.identifier("contentType"),
+              this.#z("optional", [this.#z("string", [])], true),
+            ),
+            t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
+          ]),
+        ]);
+
       if (!response.content) {
-        responseOptions.elements.push(
-          comment(
-            response.description,
-            this.#z("object", [
-              t.objectExpression([
-                t.objectProperty(
-                  t.identifier("code"),
-                  this.#z("literal", [t.numericLiteral(Number(status))]),
-                ),
-                t.objectProperty(
-                  t.identifier("contentType"),
-                  this.#z("optional", [this.#z("string", [])], true),
-                ),
-                t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
-              ]),
-            ]),
-          ),
-        );
+        responseOptions.elements.push(comment(response.description, noContentResponse()));
       } else {
         const statusResponses = t.arrayExpression([]);
 
@@ -1291,12 +1290,16 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
           );
         }
 
-        responseOptions.elements.push(
-          comment(
-            response.description,
-            this.#z("discriminatedUnion", [t.stringLiteral("contentType"), statusResponses]),
-          ),
-        );
+        if (statusResponses.elements.length === 0) {
+          responseOptions.elements.push(comment(response.description, noContentResponse()));
+        } else {
+          responseOptions.elements.push(
+            comment(
+              response.description,
+              this.#z("discriminatedUnion", [t.stringLiteral("contentType"), statusResponses]),
+            ),
+          );
+        }
       }
     }
 

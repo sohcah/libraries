@@ -21,6 +21,12 @@ const ParametersSchema = z.object({
 const notImplemented = () => {
   throw new Error("Not implemented");
 };
+const blobResponseCodec = z.codec(z.instanceof(Response), z.instanceof(Blob), {
+  decode: async value => {
+    return await value.blob();
+  },
+  encode: notImplemented
+});
 export const Raw_Parameters = z.codec(ParametersSchema, z.object({}), {
   decode: notImplemented,
   encode: () => {
@@ -30,4 +36,8 @@ export const Raw_Parameters = z.codec(ParametersSchema, z.object({}), {
     };
   }
 });
-export const Raw_Response = z.discriminatedUnion("code", [/*OK*/z.discriminatedUnion("contentType", [])]);
+export const Raw_Response = z.discriminatedUnion("code", [/*OK*/z.object({
+  code: z.literal(200),
+  contentType: z.string().optional(),
+  response: blobResponseCodec
+})]);
