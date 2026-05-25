@@ -1,5 +1,5 @@
 import * as t from "@babel/types";
-import { relative, dirname } from "node:path/posix";
+import { relative, dirname, sep } from "node:path";
 import type { JsDocument } from "./index.ts";
 
 export function ensureImport(
@@ -49,7 +49,7 @@ export function relativeImportPath(
   to: string,
   behaviour: ImportExtensionsBehaviour = "retain",
 ) {
-  const basePath = relative(dirname(from), to);
+  const basePath = relative(dirname(from), to).split(sep).join("/");
   const path = basePath.startsWith(".") ? basePath : "./" + basePath;
   if (behaviour === "remove") {
     return path.replace(/\.[^\.]+$/, "");
