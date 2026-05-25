@@ -25,6 +25,10 @@ import {
 } from "../js/stringLiteralOrIdentifier.js";
 import { ensureImport, relativeImportPath } from "../js/ensureImport.js";
 
+function getIdentifierSafeOperationKey(ref: OperationReference): string {
+  return getOperationKey(ref).replace(/[^a-zA-Z0-9]/g, "__");
+}
+
 function comment<T extends t.Node>(comment: string | null | undefined, node: T) {
   if (!comment) return node;
   return t.addComment(node, "leading", comment);
@@ -458,7 +462,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       const keyParam = t.identifier("key");
       keyParam.typeAnnotation = t.tsTypeAnnotation(t.tsStringKeyword());
       return {
-        schema: this.#z("catchall", [this.#z("object", [object]), valueSchema.schema]),
+        schema: this.#z("catchall", [this.#z("object", [object]), valueSchema.schema], true),
         type: this.#zSchemaType(
           t.tsTypeLiteral([
             ...objectTypeInput.members,
@@ -546,6 +550,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
           };
         }
       }
+      /* v8 ignore next -- defensive: the suffix loop above always finds the entry we just inserted. */
       throw new Error(`Schema ${schema.$ref} not found`);
     }
 
@@ -711,8 +716,11 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
 
     if (schema.enum) {
       const literals = schema.enum.map(this.#literal);
+      // `z.enum` only accepts string/number entries; fall back to `z.literal`
+      // for enums that include boolean values.
+      const helper = literals.some((l) => t.isBooleanLiteral(l)) ? "literal" : "enum";
       return {
-        schema: this.#z("enum", [t.arrayExpression(literals)]),
+        schema: this.#z(helper, [t.arrayExpression(literals)]),
         type: this.#zSchemaType(t.tsUnionType(literals.map((l) => t.tsLiteralType(l)))),
       };
     }
@@ -751,34 +759,27 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
         };
       }
 
+      const applyOverride = (override: ZodSchemaOverride): ZodSchema => {
+        ensureImport(this.#imports, override.name, override.from);
+        return {
+          schema: t.callExpression(t.identifier(override.name), []),
+          type: t.tsTypeReference(
+            t.identifier("ReturnType"),
+            t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(override.name))]),
+          ),
+        };
+      };
+
       if ("format" in schema && schema.format) {
         const formatOverride = this.#options.overrideFormats?.[schema.format];
         if (formatOverride) {
-          if (formatOverride.type === "import") {
-            ensureImport(this.#imports, formatOverride.name, formatOverride.from);
-            return {
-              schema: t.callExpression(t.identifier(formatOverride.name), []),
-              type: t.tsTypeReference(
-                t.identifier("ReturnType"),
-                t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(formatOverride.name))]),
-              ),
-            };
-          }
+          return applyOverride(formatOverride);
         }
       }
 
       const override = this.#options.overrideSchema?.(schema);
       if (override) {
-        if (override.type === "import") {
-          ensureImport(this.#imports, override.name, override.from);
-          return {
-            schema: t.callExpression(t.identifier(override.name), []),
-            type: t.tsTypeReference(
-              t.identifier("ReturnType"),
-              t.tsTypeParameterInstantiation([t.tsTypeQuery(t.identifier(override.name))]),
-            ),
-          };
-        }
+        return applyOverride(override);
       }
 
       if (schema.type === "string") {
@@ -814,10 +815,12 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       if (schema.type === "object") {
         return this.#getZodObjectSchema(document, schema, ctx);
       }
+      /* v8 ignore start -- schema.type is "array" at this point; satisfies-never is a purely TypeScript-level safety net. */
       if (schema.type === "array") {
         return this.#getZodArraySchema(document, schema, ctx);
       }
       schema.type satisfies never;
+      /* v8 ignore stop */
     }
 
     return {
@@ -1026,6 +1029,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     };
 
     const operationKey = getOperationKey(ref);
+    const safeOperationKey = getIdentifierSafeOperationKey(ref);
 
     const objectExpression = t.objectExpression([]);
     const pathParameters: Record<string, t.Expression> = {};
@@ -1119,24 +1123,33 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
             ? this.#z("never", [])
             : contentOptions.size === 1
               ? contentOptions.values().next().value!
-              : this.#z("union", [...contentOptions.values()]),
+              : this.#z("union", [t.arrayExpression([...contentOptions.values()])]),
         ),
       );
     }
 
     if (bodyOptions.some((opt) => opt.hasContentType)) {
-      headerStatements.body.push(
-        createAppendStatement(
-          t.identifier("headers"),
-          "Content-Type",
-          t.memberExpression(
-            t.memberExpression(valueIdentifier(), t.identifier("data")),
-            t.identifier("contentType"),
-          ),
-          { type: "string" },
-          bodyOptions.every((opt) => opt.hasContentType),
-        )!,
+      const dataMember = t.memberExpression(valueIdentifier(), t.identifier("data"));
+      const appendCall = t.expressionStatement(
+        t.callExpression(t.memberExpression(t.identifier("headers"), t.identifier("append")), [
+          t.stringLiteral("Content-Type"),
+          t.memberExpression(dataMember, t.identifier("contentType")),
+        ]),
       );
+
+      if (bodyOptions.every((opt) => opt.hasContentType)) {
+        headerStatements.body.push(appendCall);
+      } else {
+        // When only some variants of the body union carry a contentType, use
+        // `"contentType" in value.data` so TypeScript narrows the union
+        // before we read the property.
+        headerStatements.body.push(
+          t.ifStatement(
+            t.binaryExpression("in", t.stringLiteral("contentType"), dataMember),
+            appendCall,
+          ),
+        );
+      }
     }
 
     const parameterEncode = t.blockStatement([]);
@@ -1200,7 +1213,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
         t.exportNamedDeclaration(
           t.variableDeclaration("const", [
             t.variableDeclarator(
-              t.identifier(`${operationKey}_Parameters`),
+              t.identifier(`${safeOperationKey}_Parameters`),
               this.#createCodec(
                 this.#ensureParametersSchema(),
                 this.#z("object", [objectExpression]),
@@ -1217,8 +1230,22 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     );
   }
 
+  #blobFallbackResponse(code: t.Expression): t.Expression {
+    return this.#z("object", [
+      t.objectExpression([
+        t.objectProperty(t.identifier("code"), code),
+        t.objectProperty(
+          t.identifier("contentType"),
+          this.#z("optional", [this.#z("string", [])], true),
+        ),
+        t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
+      ]),
+    ]);
+  }
+
   async #addOperationResponse(document: ApiDocument, ref: OperationReference): Promise<void> {
     const operationKey = getOperationKey(ref);
+    const safeOperationKey = getIdentifierSafeOperationKey(ref);
 
     const responseOptions = t.arrayExpression([]);
 
@@ -1229,26 +1256,16 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
       }
 
       const response = dereference(responseRef);
+
+      const noContentResponse = () =>
+        this.#blobFallbackResponse(this.#z("literal", [t.numericLiteral(Number(status))]));
+
       if (!response.content) {
-        responseOptions.elements.push(
-          comment(
-            response.description,
-            this.#z("object", [
-              t.objectExpression([
-                t.objectProperty(
-                  t.identifier("code"),
-                  this.#z("literal", [t.numericLiteral(Number(status))]),
-                ),
-                t.objectProperty(t.identifier("contentType"), this.#z("string", [])),
-                t.objectProperty(t.identifier("response"), this.#ensureBlobResponseCodec()),
-              ]),
-            ]),
-          ),
-        );
+        responseOptions.elements.push(comment(response.description, noContentResponse()));
       } else {
         const statusResponses = t.arrayExpression([]);
 
-        for (const entry of Map.groupBy(Object.entries(response.content ?? {}), (i) =>
+        for (const entry of Map.groupBy(Object.entries(response.content), (i) =>
           JSON.stringify(i[1]),
         ).values()) {
           const contentTypes = entry.map((i) => i[0]);
@@ -1282,31 +1299,42 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
           );
         }
 
-        responseOptions.elements.push(
-          comment(
-            response.description,
-            this.#z("discriminatedUnion", [t.stringLiteral("contentType"), statusResponses]),
-          ),
-        );
+        if (statusResponses.elements.length === 0) {
+          responseOptions.elements.push(comment(response.description, noContentResponse()));
+        } else {
+          responseOptions.elements.push(
+            comment(
+              response.description,
+              this.#z("discriminatedUnion", [t.stringLiteral("contentType"), statusResponses]),
+            ),
+          );
+        }
       }
     }
+
+    // When the operation declares no usable responses, fall back to the same
+    // blob-of-bytes shape we use for declared no-content responses but with
+    // `z.number()` for the code so any status is accepted. This keeps the
+    // emitted type usable (`{ code, contentType?, response }`) instead of the
+    // dead-end `z.never()` that `z.discriminatedUnion` would require.
+    const responseSchema =
+      responseOptions.elements.length === 0
+        ? this.#blobFallbackResponse(this.#z("number", []))
+        : this.#z("discriminatedUnion", [t.stringLiteral("code"), responseOptions]);
 
     this.#operations.push(
       t.exportNamedDeclaration(
         t.variableDeclaration("const", [
-          t.variableDeclarator(
-            t.identifier(`${operationKey}_Response`),
-            this.#z("discriminatedUnion", [t.stringLiteral("code"), responseOptions]),
-          ),
+          t.variableDeclarator(t.identifier(`${safeOperationKey}_Response`), responseSchema),
         ]),
       ),
     );
   }
 
   async visitOperation(document: ApiDocument, ref: OperationReference): Promise<void> {
-    this.#addOperationParameters(document, ref);
+    await this.#addOperationParameters(document, ref);
 
-    this.#addOperationResponse(document, ref);
+    await this.#addOperationResponse(document, ref);
   }
 
   async complete(): Promise<void> {
@@ -1321,7 +1349,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
 
   async [JsSchemaGeneratorExtension.getParameterType](doc: JsDocument, ref: OperationReference) {
     ensureImport(doc.imports, "z", "zod", true);
-    const schemaName = `${getOperationKey(ref)}_Parameters`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Parameters`;
     ensureImport(
       doc.imports,
       schemaName,
@@ -1336,7 +1364,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     parameters: t.Expression,
   ) {
     ensureImport(doc.imports, "z", "zod");
-    const schemaName = `${getOperationKey(ref)}_Parameters`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Parameters`;
     ensureImport(
       doc.imports,
       schemaName,
@@ -1346,7 +1374,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
   }
   async [JsSchemaGeneratorExtension.getResponseType](doc: JsDocument, ref: OperationReference) {
     ensureImport(doc.imports, "z", "zod", true);
-    const schemaName = `${getOperationKey(ref)}_Response`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Response`;
     ensureImport(
       doc.imports,
       schemaName,
@@ -1361,7 +1389,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     response: t.Expression,
   ) {
     ensureImport(doc.imports, "z", "zod");
-    const schemaName = `${getOperationKey(ref)}_Response`;
+    const schemaName = `${getIdentifierSafeOperationKey(ref)}_Response`;
     ensureImport(
       doc.imports,
       schemaName,
