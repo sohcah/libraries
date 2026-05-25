@@ -1123,24 +1123,33 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
             ? this.#z("never", [])
             : contentOptions.size === 1
               ? contentOptions.values().next().value!
-              : this.#z("union", [...contentOptions.values()]),
+              : this.#z("union", [t.arrayExpression([...contentOptions.values()])]),
         ),
       );
     }
 
     if (bodyOptions.some((opt) => opt.hasContentType)) {
-      headerStatements.body.push(
-        createAppendStatement(
-          t.identifier("headers"),
-          "Content-Type",
-          t.memberExpression(
-            t.memberExpression(valueIdentifier(), t.identifier("data")),
-            t.identifier("contentType"),
-          ),
-          { type: "string" },
-          bodyOptions.every((opt) => opt.hasContentType),
-        )!,
+      const dataMember = t.memberExpression(valueIdentifier(), t.identifier("data"));
+      const appendCall = t.expressionStatement(
+        t.callExpression(t.memberExpression(t.identifier("headers"), t.identifier("append")), [
+          t.stringLiteral("Content-Type"),
+          t.memberExpression(dataMember, t.identifier("contentType")),
+        ]),
       );
+
+      if (bodyOptions.every((opt) => opt.hasContentType)) {
+        headerStatements.body.push(appendCall);
+      } else {
+        // When only some variants of the body union carry a contentType, use
+        // `"contentType" in value.data` so TypeScript narrows the union
+        // before we read the property.
+        headerStatements.body.push(
+          t.ifStatement(
+            t.binaryExpression("in", t.stringLiteral("contentType"), dataMember),
+            appendCall,
+          ),
+        );
+      }
     }
 
     const parameterEncode = t.blockStatement([]);

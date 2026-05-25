@@ -49,7 +49,7 @@ const blobResponseCodec = z.codec(z.instanceof(Response), z.instanceof(Blob), {
   encode: notImplemented
 });
 export const Upload_Parameters = z.codec(ParametersSchema, z.object({
-  data: z.union(z.codec(z.object({
+  data: z.union([z.codec(z.object({
     contentType: z.string(),
     content: z.string()
   }), z.object({
@@ -70,12 +70,12 @@ export const Upload_Parameters = z.codec(ParametersSchema, z.object({
         content: formData
       };
     }
-  }))
+  })])
 }), {
   decode: notImplemented,
   encode: value => {
     const headers = new Headers();
-    if (value.data.contentType !== undefined) headers.append("Content-Type", value.data.contentType);
+    if ("contentType" in value.data) headers.append("Content-Type", value.data.contentType);
     return {
       path: `/upload`,
       method: "POST",
