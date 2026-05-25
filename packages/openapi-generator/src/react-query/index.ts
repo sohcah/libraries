@@ -100,6 +100,7 @@ function createQueryResultType(type: "Success" | "Error"): t.TSTypeAliasDeclarat
 export class ReactQueryGenerator implements OpenApiGenerator {
   #options: ReactQueryGeneratorInternalOptions;
   #apiBody: t.ClassBody;
+  #apiInvalidatorBody: t.ClassBody;
 
   #doc: JsDocument;
 
@@ -110,7 +111,44 @@ export class ReactQueryGenerator implements OpenApiGenerator {
       imports: [],
       importExtensions: options.importExtensions ?? "retain",
     };
-    this.#apiBody = t.classBody([t.classPrivateProperty(t.privateName(t.identifier("api")))]);
+    this.#apiBody = t.classBody([
+      t.classPrivateProperty(t.privateName(t.identifier("api"))),
+      t.classPrivateProperty(t.privateName(t.identifier("queryClient"))),
+    ]);
+
+    this.#apiInvalidatorBody = this.#createInitialApiInvalidatorBody();
+  }
+
+  #queryClientTypeReference(): t.TSTypeReference {
+    return t.tsTypeReference(
+      ensureImport(this.#doc.imports, "QueryClient", "@tanstack/react-query", true),
+    );
+  }
+
+  #createInitialApiInvalidatorBody(): t.ClassBody {
+    const queryClientField = t.classPrivateProperty(t.privateName(t.identifier("queryClient")));
+    queryClientField.typeAnnotation = t.tsTypeAnnotation(this.#queryClientTypeReference());
+
+    const constructorMethod = t.classMethod(
+      "constructor",
+      t.identifier("constructor"),
+      [
+        Object.assign(t.identifier("queryClient"), {
+          typeAnnotation: t.tsTypeAnnotation(this.#queryClientTypeReference()),
+        }),
+      ],
+      t.blockStatement([
+        t.expressionStatement(
+          t.assignmentExpression(
+            "=",
+            t.memberExpression(t.thisExpression(), t.privateName(t.identifier("queryClient"))),
+            t.identifier("queryClient"),
+          ),
+        ),
+      ]),
+    );
+
+    return t.classBody([queryClientField, constructorMethod]);
   }
 
   async visitOperation(document: ApiDocument, ref: OperationReference): Promise<void> {
@@ -270,6 +308,12 @@ export class ReactQueryGenerator implements OpenApiGenerator {
         methodName.type === "StringLiteral",
       ),
     );
+
+    if (!isMutation) {
+      this.#apiInvalidatorBody.body.push(
+        this.#buildInvalidatorMethod(operationKey, first(operationKey, "upper"), parametersType),
+      );
+    }
   }
 
   async complete(): Promise<void> {
@@ -285,6 +329,9 @@ export class ReactQueryGenerator implements OpenApiGenerator {
               ),
             ),
           }),
+          Object.assign(t.identifier("queryClient"), {
+            typeAnnotation: t.tsTypeAnnotation(this.#queryClientTypeReference()),
+          }),
         ],
         t.blockStatement([
           t.expressionStatement(
@@ -293,6 +340,28 @@ export class ReactQueryGenerator implements OpenApiGenerator {
               t.memberExpression(t.thisExpression(), t.privateName(t.identifier("api"))),
               t.identifier("api"),
             ),
+          ),
+          t.expressionStatement(
+            t.assignmentExpression(
+              "=",
+              t.memberExpression(t.thisExpression(), t.privateName(t.identifier("queryClient"))),
+              t.identifier("queryClient"),
+            ),
+          ),
+        ]),
+      ),
+    );
+
+    this.#apiBody.body.push(
+      t.classMethod(
+        "get",
+        t.identifier("invalidate"),
+        [],
+        t.blockStatement([
+          t.returnStatement(
+            t.newExpression(t.identifier("ApiInvalidator"), [
+              t.memberExpression(t.thisExpression(), t.privateName(t.identifier("queryClient"))),
+            ]),
           ),
         ]),
       ),
@@ -308,8 +377,65 @@ export class ReactQueryGenerator implements OpenApiGenerator {
       queryResultTypeSuccess,
       queryResultTypeError,
       t.exportNamedDeclaration(t.classDeclaration(t.identifier("Api"), null, this.#apiBody)),
+      t.classDeclaration(t.identifier("ApiInvalidator"), null, this.#apiInvalidatorBody),
     ]);
     await writeFile(this.#options.output, generate(program).code);
+  }
+
+  #buildInvalidatorMethod(
+    operationKey: string,
+    queryKeyName: string,
+    parametersType: t.TSType,
+  ): t.ClassMethod {
+    const parameters = Object.assign(t.identifier("parameters"), {
+      optional: true,
+      typeAnnotation: t.tsTypeAnnotation(
+        t.tsTypeReference(
+          t.identifier("Partial"),
+          t.tsTypeParameterInstantiation([parametersType]),
+        ),
+      ),
+    });
+
+    const methodName = stringLiteralOrIdentifier(operationKey);
+
+    // ["QueryKeyName", ...(parameters ? [parameters] : [])]
+    const queryKeyArray = t.arrayExpression([
+      t.stringLiteral(queryKeyName),
+      t.spreadElement(
+        t.conditionalExpression(
+          t.identifier("parameters"),
+          t.arrayExpression([t.identifier("parameters")]),
+          t.arrayExpression([]),
+        ),
+      ),
+    ]);
+
+    // return this.#queryClient.invalidateQueries({ queryKey: [...] });
+    const body = t.blockStatement([
+      t.returnStatement(
+        t.awaitExpression(
+          t.callExpression(
+            t.memberExpression(
+              t.memberExpression(t.thisExpression(), t.privateName(t.identifier("queryClient"))),
+              t.identifier("invalidateQueries"),
+            ),
+            [t.objectExpression([t.objectProperty(t.identifier("queryKey"), queryKeyArray)])],
+          ),
+        ),
+      ),
+    ]);
+
+    return t.classMethod(
+      "method",
+      methodName,
+      [parameters],
+      body,
+      methodName.type === "StringLiteral",
+      false,
+      false,
+      true,
+    );
   }
 }
 
