@@ -42,7 +42,8 @@ const ParametersSchema = z.object({
   headers: z.instanceof(Headers).optional(),
   body: z.union([z.string(), z.instanceof(Blob), z.instanceof(FormData), z.instanceof(URLSearchParams)]).optional()
 });
-const blobResponseCodec = z.codec(z.instanceof(Response), z.instanceof(Blob), {
+const responseSchema = z.custom<Response>(value => value instanceof globalThis.Response || Object.prototype.toString.call(value) === "[object Response]");
+const blobResponseCodec = z.codec(responseSchema, z.instanceof(Blob), {
   decode: async value => {
     return await value.blob();
   },
