@@ -21,7 +21,8 @@ const ParametersSchema = z.object({
 const notImplemented = () => {
   throw new Error("Not implemented");
 };
-const blobResponseCodec = z.codec(z.instanceof(Response), z.instanceof(Blob), {
+const responseSchema = z.custom<Response>(value => value instanceof globalThis.Response || Object.prototype.toString.call(value) === "[object Response]");
+const blobResponseCodec = z.codec(responseSchema, z.instanceof(Blob), {
   decode: async value => {
     return await value.blob();
   },

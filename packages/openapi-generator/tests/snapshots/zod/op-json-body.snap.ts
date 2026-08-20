@@ -39,7 +39,8 @@ const ParametersSchema = z.object({
   headers: z.instanceof(Headers).optional(),
   body: z.union([z.string(), z.instanceof(Blob), z.instanceof(FormData), z.instanceof(URLSearchParams)]).optional()
 });
-const jsonResponseCodec = z.codec(z.instanceof(Response), z.unknown(), {
+const responseSchema = z.custom<Response>(value => value instanceof globalThis.Response || Object.prototype.toString.call(value) === "[object Response]");
+const jsonResponseCodec = z.codec(responseSchema, z.unknown(), {
   decode: async (response, ctx): Promise<unknown> => {
     try {
       return await response.json();

@@ -154,6 +154,56 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
     return t.identifier("notImplemented");
   }
 
+  // expo/fetch returns a Response from a different constructor than the
+  // global `Response`, so `value instanceof Response` can be false. Accept either
+  // a true instanceof match or the [[Class]] tag (`[object Response]`).
+  #hasResponseSchema = false;
+  #ensureResponseSchema(): t.Expression {
+    if (!this.#hasResponseSchema) {
+      this.#hasResponseSchema = true;
+      this.#header.push(
+        t.variableDeclaration("const", [
+          t.variableDeclarator(
+            t.identifier("responseSchema"),
+            this.#z(
+              "custom",
+              [
+                t.arrowFunctionExpression(
+                  [t.identifier("value")],
+                  t.logicalExpression(
+                    "||",
+                    t.binaryExpression(
+                      "instanceof",
+                      t.identifier("value"),
+                      t.memberExpression(t.identifier("globalThis"), t.identifier("Response")),
+                    ),
+                    t.binaryExpression(
+                      "===",
+                      t.callExpression(
+                        t.memberExpression(
+                          t.memberExpression(
+                            t.memberExpression(t.identifier("Object"), t.identifier("prototype")),
+                            t.identifier("toString"),
+                          ),
+                          t.identifier("call"),
+                        ),
+                        [t.identifier("value")],
+                      ),
+                      t.stringLiteral("[object Response]"),
+                    ),
+                  ),
+                ),
+              ],
+              false,
+              t.tsTypeParameterInstantiation([t.tsTypeReference(t.identifier("Response"))]),
+            ),
+          ),
+        ]),
+      );
+    }
+    return t.identifier("responseSchema");
+  }
+
   #hasBlobResponseCodec = false;
   #ensureBlobResponseCodec(): t.Expression {
     if (!this.#hasBlobResponseCodec) {
@@ -163,7 +213,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
           t.variableDeclarator(
             t.identifier("blobResponseCodec"),
             this.#createCodec(
-              this.#z("instanceof", [t.identifier("Response")]),
+              this.#ensureResponseSchema(),
               this.#z("instanceof", [t.identifier("Blob")]),
               t.arrowFunctionExpression(
                 [t.identifier("value")],
@@ -253,7 +303,7 @@ export class ZodGenerator implements OpenApiGenerator, OpenApiJsSchemaGenerator 
           t.variableDeclarator(
             t.identifier("jsonResponseCodec"),
             this.#createCodec(
-              this.#z("instanceof", [t.identifier("Response")]),
+              this.#ensureResponseSchema(),
               this.#z("unknown", []),
               decode,
               this.#ensureNotImplementedFunction(),
